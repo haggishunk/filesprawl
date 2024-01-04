@@ -1,0 +1,33 @@
+---
+version: '3'
+
+services:
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: filesprawl
+      POSTGRES_USER: sprawler
+      POSTGRES_PASSWORD: test-only
+    volumes:
+    - $PWD/db/init/:/docker-entrypoint-initdb.d/:ro
+    - postgres_data:/var/lib/postgresql/data
+    networks:
+    - postgres
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+    - PGADMIN_DEFAULT_EMAIL=admin@example.com
+    - PGADMIN_DEFAULT_PASSWORD=adminpassword
+    ports:
+    - "8080:80"
+    networks:
+    - postgres
+    depends_on:
+    - postgres
+
+volumes:
+  postgres_data: {}
+
+networks:
+  postgres: {}
