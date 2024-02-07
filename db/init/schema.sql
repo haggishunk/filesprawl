@@ -3,8 +3,7 @@ CREATE TYPE hash_type_enum AS ENUM ('md5', 'dropbox', 'sha1', 'sha256');
 CREATE TABLE IF NOT EXISTS object_hash (
     id SERIAL PRIMARY KEY,
     hash_value TEXT NOT NULL,
-    hash_type hash_type_enum NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    hash_type hash_type_enum NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS remote (
