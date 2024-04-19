@@ -5,12 +5,12 @@ import (
 )
 
 func TestBase(t *testing.T) {
-	obj := Object{
+	obj := Meta{
 		Name: "file",
 		Path: "full/dir/path/file",
 	}
-	want := "file"
-	if got := obj.Base(); want != got {
+	want := "file/dir/path"
+	if got := obj.BasePath; want != got {
 		t.Errorf("Got %s, want %s", got, want)
 	}
 }

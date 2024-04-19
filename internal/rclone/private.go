@@ -18,7 +18,7 @@ import (
 // using file, env vars, args
 var (
 	noOutput  = false
-	url       = "http://localhost:5572/"
+	url       = "http://localhost:5572/operations/list"
 	jsonInput = ""
 	authUser  = ""
 	authPass  = ""
@@ -39,9 +39,12 @@ func errorf(status int, path string, format string, arg ...any) (out rc.Params, 
 
 func doCall(ctx context.Context, path string, in rc.Params) (out rc.Params, err error) {
 	client := fshttp.NewClient(ctx)
-	url += path
-	data, err := json.Marshal(in)
 
+	// fmt.Printf("Calling path: %s\n", url)
+
+	// fmt.Printf("With params: %s", in)
+
+	data, err := json.Marshal(in)
 	if err != nil {
 		return errorf(http.StatusBadRequest, path, "failed to encode request: %w", err)
 	}
@@ -50,6 +53,7 @@ func doCall(ctx context.Context, path string, in rc.Params) (out rc.Params, err 
 	if err != nil {
 		return errorf(http.StatusInternalServerError, path, "failed to make request: %w", err)
 	}
+	// fmt.Println("Got my request")
 
 	req.Header.Set("Content-Type", "application/json")
 	if authUser != "" || authPass != "" {
@@ -61,6 +65,7 @@ func doCall(ctx context.Context, path string, in rc.Params) (out rc.Params, err 
 		return errorf(http.StatusServiceUnavailable, path, "connection failed: %w", err)
 	}
 	defer fs.CheckClose(resp.Body, &err)
+	// fmt.Printf("Got response: %s\n", resp)
 
 	// Read response
 	var body []byte
