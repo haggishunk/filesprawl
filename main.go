@@ -7,6 +7,9 @@ import (
 
 	"github.com/haggishunk/filesprawl/internal/database"
 	"github.com/haggishunk/filesprawl/internal/object"
+	"github.com/haggishunk/filesprawl/internal/operation"
+	"github.com/haggishunk/filesprawl/internal/rclone"
+	"github.com/haggishunk/filesprawl/internal/remote"
 	"github.com/haggishunk/filesprawl/internal/repository"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,7 +28,7 @@ func main() {
 		log.Fatal("Error parsing database url: %w", err)
 	}
 	config.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
-		log.Printf("Connected to database with pid %s", conn.PgConn().PID())
+		log.Printf("Connected to database with pid %d", conn.PgConn().PID())
 		return nil
 	}
 
@@ -39,17 +42,38 @@ func main() {
 
 	repo := repository.NewObjectRepository(database.NewPgxDatabase(pool))
 
-	// sample code to retrieve a hash from a db repo
-	h := object.Hash{
-		Hash: "872f92f3",
-		Type: "md5",
-	}
+	// BEGIN SAMPLE CODE
+	// retrieve a hash from a db repo
+	h := object.NewHash("jkdjfw", "md5")
 
 	// demonstrates how a query result from rclone could be
 	// referenced against and persisted in a database
-	id, err := repo.GetHash(context.Background(), h)
+	err = repo.ReadHash(context.Background(), &h)
 	if err != nil {
-		log.Printf("Error retrieving hash: %s", err)
+		log.Printf("Error retrieving hash: %s\n", err)
 	}
-	log.Println("ID: ", id)
+	if h.Persisted {
+		log.Printf("Found persisted hash: %s\n", h)
+	} else {
+		log.Printf("Hash not found in db: %s", h.Hash)
+	}
+	// END SAMPLE CODE
+
+	rem := remote.Remote{}
+	rem.Hostname = "guru"
+	rem.Name = "dbox:"
+
+	scn := operation.NewScanner(
+		operation.WithRemote(&rem),
+		operation.WithRepo(repo),
+	)
+	// persist scan start
+
+	lo := rclone.NewListOption(rclone.ListOptionFilesOnly())
+	lc := rclone.NewListConfig(rem.Name, "code/flux", &lo)
+
+	err = operation.Scan(context.Background(), &scn, lc)
+	if err != nil {
+		log.Panic("Failed %w", err)
+	}
 }
