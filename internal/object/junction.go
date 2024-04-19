@@ -14,7 +14,7 @@ type MetaHashJunction struct {
 }
 
 func (o MetaHashJunction) String() string {
-	return fmt.Sprintf("{MetaId: %d, HashId: %d}", o.MetaId, o.HashId)
+	return fmt.Sprintf("{MetaId: %d, HashId: %d, ScanTime: %s}", o.MetaId, o.HashId, o.ScanTime)
 }
 
 type MetaHashJunctionOption func(*MetaHashJunction)

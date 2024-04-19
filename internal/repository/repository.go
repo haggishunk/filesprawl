@@ -76,7 +76,7 @@ func (r *ObjectRepository) ReadHash(ctx context.Context, h *object.Hash) error {
 	return nil
 }
 
-func (r *ObjectRepository) WriteMeta(ctx context.Context, om *object.Meta) error {
+func (r *ObjectRepository) WriteMeta(ctx context.Context, m *object.Meta) error {
 	// write to database if not exists
 	// return new or existing id
 	var id int
@@ -87,19 +87,19 @@ func (r *ObjectRepository) WriteMeta(ctx context.Context, om *object.Meta) error
 		RETURNING id;
 	`
 
-	row := r.db.QueryRow(ctx, statement, om.Name, om.Path, om.MimeType)
+	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType)
 	err := row.Scan(&id)
 
 	if err != nil {
 		return fmt.Errorf("failed to persist object meta: %w", err)
 	}
 
-	om.Id = id
-	om.Persisted = true
+	m.Id = id
+	m.Persisted = true
 	return nil
 }
 
-func (r *ObjectRepository) ReadMeta(ctx context.Context, om *object.Meta) error {
+func (r *ObjectRepository) ReadMeta(ctx context.Context, m *object.Meta) error {
 	// write to database if not exists
 	// return new or existing id
 	var id int
@@ -110,7 +110,7 @@ func (r *ObjectRepository) ReadMeta(ctx context.Context, om *object.Meta) error 
 		WHERE object_name = $1 AND object_path = $2 AND object_mime_type = $3;
 	`
 
-	row := r.db.QueryRow(ctx, statement, om.Name, om.Path, om.MimeType)
+	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType)
 	err := row.Scan(&id)
 
 	if err != nil {
@@ -123,8 +123,8 @@ func (r *ObjectRepository) ReadMeta(ctx context.Context, om *object.Meta) error 
 		return fmt.Errorf("failed to retrieve meta: %w", err)
 	}
 
-	om.Id = id
-	om.Persisted = true
+	m.Id = id
+	m.Persisted = true
 	return nil
 }
 
@@ -157,26 +157,26 @@ func (r *ObjectRepository) ReadMetaHashJunction(ctx context.Context, mhj *object
 	return nil
 }
 
-func (r *ObjectRepository) WriteMetaHashJunction(ctx context.Context, omhj *object.MetaHashJunction) error {
+func (r *ObjectRepository) WriteMetaHashJunction(ctx context.Context, mhj *object.MetaHashJunction) error {
 	// write to database if not exists
 	// return new or existing id
 	var id int
 
 	statement := `
-		INSERT INTO object_hash_junction (object_meta_id, object_hash_id)
-		VALUES ($1, $2)
+		INSERT INTO object_hash_junction (scan_time, object_meta_id, object_hash_id)
+		VALUES ($1, $2, $3)
 		RETURNING id;
 	`
 
-	row := r.db.QueryRow(ctx, statement, omhj.MetaId, omhj.HashId)
+	row := r.db.QueryRow(ctx, statement, mhj.ScanTime, mhj.MetaId, mhj.HashId)
 	err := row.Scan(&id)
 
 	if err != nil {
 		return fmt.Errorf("failed to persist object hash junction: %w", err)
 	}
 
-	omhj.Id = id
-	omhj.Persisted = true
+	mhj.Id = id
+	mhj.Persisted = true
 	return nil
 }
 
@@ -221,6 +221,7 @@ func (r *ObjectRepository) PersistResult(ctx context.Context, lri rclone.ListRes
 
 		// get or set object hash junction
 		mhj := object.NewMetaHashJunction(m.Id, h.Id)
+		fmt.Printf("Found object meta-hash junction: %s\n", mhj)
 		err = r.ReadMetaHashJunction(ctx, &mhj)
 		if err != nil {
 			return fmt.Errorf("failed to get object meta hash junction from db: %w", err)
