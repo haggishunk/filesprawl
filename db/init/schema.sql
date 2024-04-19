@@ -15,17 +15,14 @@ CREATE TABLE IF NOT EXISTS remote (
 
 CREATE TABLE IF NOT EXISTS object_meta (
   id SERIAL PRIMARY KEY,
-  object_id TEXT NOT NULL,
   object_name TEXT NOT NULL,
   object_path TEXT NOT NULL,
-  object_mime_type TEXT NOT NULL,
-  object_size BIGINT,
-  remote_id INT,
-  FOREIGN KEY (remote_id) REFERENCES remote(id)
+  object_mime_type TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS object_hash_junction (
   id SERIAL PRIMARY KEY,
+  scan_time TIMESTAMP,
   object_meta_id INT,
   object_hash_id INT,
   FOREIGN KEY (object_meta_id) REFERENCES object_meta(id),
