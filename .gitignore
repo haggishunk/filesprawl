@@ -1,3 +1,5 @@
+.augment
 .envrc
 .tags
-secrets/
+build
+secrets
