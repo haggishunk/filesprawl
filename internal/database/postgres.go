@@ -11,6 +11,7 @@ import (
 // Defines what functional scope and signatures a Database should have
 type Database interface {
 	QueryRow(ctx context.Context, query string, args ...interface{}) pgx.Row
+	Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error)
 	Exec(ctx context.Context, query string, args ...interface{}) (pgconn.CommandTag, error)
 }
 
@@ -28,6 +29,11 @@ func NewPgxDatabase(p *pgxpool.Pool) *PgxDatabase {
 // QueryRow implements the Database interface for the function of the same name
 func (d *PgxDatabase) QueryRow(ctx context.Context, query string, args ...any) pgx.Row {
 	return d.pool.QueryRow(ctx, query, args...)
+}
+
+// Query implements the Database interface for multi-row queries
+func (d *PgxDatabase) Query(ctx context.Context, query string, args ...any) (pgx.Rows, error) {
+	return d.pool.Query(ctx, query, args...)
 }
 
 // Exec implements the Database interface for the function of the same name

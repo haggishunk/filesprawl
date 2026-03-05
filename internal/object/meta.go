@@ -14,6 +14,7 @@ type Meta struct {
 	// and for freshness of scan directory targeting
 	BasePath  string
 	MimeType  string
+	Size      int64
 	Persisted bool
 }
 
@@ -34,12 +35,20 @@ func NewMeta(n string, p string, m string, oo ...MetaOption) Meta {
 		Id:        -1,
 		Name:      n,
 		Path:      p,
-		BasePath:  path.Base(p),
+		BasePath:  path.Dir(p),
 		MimeType:  m,
+		Size:      0,
 		Persisted: false,
 	}
 	for _, of := range oo {
 		of(&o)
 	}
 	return o
+}
+
+// WithMetaSize sets the size in bytes on a Meta object
+func WithMetaSize(s int64) MetaOption {
+	return func(o *Meta) {
+		o.Size = s
+	}
 }

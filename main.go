@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
+	"github.com/haggishunk/filesprawl/internal/analysis"
 	"github.com/haggishunk/filesprawl/internal/database"
 	"github.com/haggishunk/filesprawl/internal/object"
 	"github.com/haggishunk/filesprawl/internal/operation"
@@ -75,5 +77,14 @@ func main() {
 	err = operation.Scan(context.Background(), &scn, lc)
 	if err != nil {
 		log.Panic("Failed %w", err)
+	}
+
+	// Duplicate detection across all remotes
+	detector := analysis.NewDuplicateDetector(repo)
+	groups, err := detector.FindAcrossRemotes(context.Background(), analysis.FilterOptions{})
+	if err != nil {
+		log.Printf("Error finding duplicates: %v", err)
+	} else {
+		fmt.Print(analysis.FormatReport(groups))
 	}
 }

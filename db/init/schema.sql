@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS object_hash (
     hash_type hash_type_enum NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_object_hash_value ON object_hash (hash_value);
+
 CREATE TABLE IF NOT EXISTS remote (
   id SERIAL PRIMARY KEY,
   remote_name TEXT NOT NULL,
@@ -17,7 +19,8 @@ CREATE TABLE IF NOT EXISTS object_meta (
   id SERIAL PRIMARY KEY,
   object_name TEXT NOT NULL,
   object_path TEXT NOT NULL,
-  object_mime_type TEXT NOT NULL
+  object_mime_type TEXT NOT NULL,
+  object_size BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS object_hash_junction (

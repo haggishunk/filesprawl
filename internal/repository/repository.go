@@ -12,6 +12,24 @@ import (
 
 // TODO: check out pgx.RowToStructByName to match structs and table columns
 
+// HashGroup represents a hash that appears on more than one file (a duplicate).
+type HashGroup struct {
+	HashValue string
+	HashType  string
+	Count     int
+}
+
+// FileRecord holds per-file metadata returned by GetFilesByHash.
+type FileRecord struct {
+	ID         int
+	Name       string
+	Path       string
+	MimeType   string
+	Size       int64
+	RemoteName string
+	Hostname   string
+}
+
 type ObjectRepository struct {
 	db database.Database
 }
@@ -82,12 +100,12 @@ func (r *ObjectRepository) WriteMeta(ctx context.Context, m *object.Meta) error 
 	var id int
 
 	statement := `
-		INSERT INTO object_meta (object_name, object_path, object_mime_type)
-		VALUES ($1, $2, $3)
+		INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id;
 	`
 
-	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType)
+	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.Size)
 	err := row.Scan(&id)
 
 	if err != nil {
@@ -103,15 +121,16 @@ func (r *ObjectRepository) ReadMeta(ctx context.Context, m *object.Meta) error {
 	// write to database if not exists
 	// return new or existing id
 	var id int
+	var size int64
 
 	statement := `
-		SELECT id
+		SELECT id, object_size
 		FROM object_meta
 		WHERE object_name = $1 AND object_path = $2 AND object_mime_type = $3;
 	`
 
 	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType)
-	err := row.Scan(&id)
+	err := row.Scan(&id, &size)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -124,6 +143,7 @@ func (r *ObjectRepository) ReadMeta(ctx context.Context, m *object.Meta) error {
 	}
 
 	m.Id = id
+	m.Size = size
 	m.Persisted = true
 	return nil
 }
@@ -182,7 +202,7 @@ func (r *ObjectRepository) WriteMetaHashJunction(ctx context.Context, mhj *objec
 
 func (r *ObjectRepository) PersistResult(ctx context.Context, lri rclone.ListResponseItem) error {
 	// get or set object meta
-	m := object.NewMeta(lri.Name, lri.Path, lri.MimeType)
+	m := object.NewMeta(lri.Name, lri.Path, lri.MimeType, object.WithMetaSize(lri.Size))
 	fmt.Printf("Found object meta: %s\n", m)
 	err := r.ReadMeta(ctx, &m)
 	if err != nil {
@@ -238,4 +258,142 @@ func (r *ObjectRepository) PersistResult(ctx context.Context, lri rclone.ListRes
 		}
 	}
 	return nil
+}
+
+// FindDuplicatesAcrossRemotes returns hashes that are shared by more than one
+// file across all remotes. Optionally filter by hashType (empty = all types).
+// Use limit=0 and offset=0 for no pagination.
+func (r *ObjectRepository) FindDuplicatesAcrossRemotes(ctx context.Context, hashType string, limit, offset int) ([]HashGroup, error) {
+	var args []interface{}
+	where := ""
+	if hashType != "" {
+		args = append(args, hashType)
+		where = "WHERE oh.hash_type = $1::hash_type_enum"
+	}
+
+	limitClause := ""
+	if limit > 0 {
+		args = append(args, limit)
+		args = append(args, offset)
+		limitClause = fmt.Sprintf("LIMIT $%d OFFSET $%d", len(args)-1, len(args))
+	}
+
+	statement := fmt.Sprintf(`
+		SELECT oh.hash_value, oh.hash_type::text, COUNT(DISTINCT om.id) AS duplicate_count
+		FROM object_hash oh
+		JOIN object_hash_junction ohj ON oh.id = ohj.object_hash_id
+		JOIN object_meta om ON ohj.object_meta_id = om.id
+		%s
+		GROUP BY oh.hash_value, oh.hash_type
+		HAVING COUNT(DISTINCT om.id) > 1
+		ORDER BY duplicate_count DESC
+		%s;
+	`, where, limitClause)
+
+	rows, err := r.db.Query(ctx, statement, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query duplicates across remotes: %w", err)
+	}
+	defer rows.Close()
+
+	var groups []HashGroup
+	for rows.Next() {
+		var g HashGroup
+		if err := rows.Scan(&g.HashValue, &g.HashType, &g.Count); err != nil {
+			return nil, fmt.Errorf("failed to scan duplicate row: %w", err)
+		}
+		groups = append(groups, g)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating duplicate rows: %w", err)
+	}
+	return groups, nil
+}
+
+// FindDuplicatesWithinRemote returns hashes shared by more than one file within
+// a specific remote. Optionally filter by hashType (empty = all types).
+func (r *ObjectRepository) FindDuplicatesWithinRemote(ctx context.Context, remoteName, hashType string, limit, offset int) ([]HashGroup, error) {
+	args := []interface{}{remoteName}
+	hashFilter := ""
+	if hashType != "" {
+		args = append(args, hashType)
+		hashFilter = fmt.Sprintf("AND oh.hash_type = $%d::hash_type_enum", len(args))
+	}
+
+	limitClause := ""
+	if limit > 0 {
+		args = append(args, limit)
+		args = append(args, offset)
+		limitClause = fmt.Sprintf("LIMIT $%d OFFSET $%d", len(args)-1, len(args))
+	}
+
+	statement := fmt.Sprintf(`
+		SELECT oh.hash_value, oh.hash_type::text, COUNT(DISTINCT om.id) AS duplicate_count
+		FROM object_hash oh
+		JOIN object_hash_junction ohj ON oh.id = ohj.object_hash_id
+		JOIN object_meta om ON ohj.object_meta_id = om.id
+		JOIN object_remote_junction orj ON om.id = orj.object_meta_id
+		JOIN remote r ON orj.remote_id = r.id
+		WHERE r.remote_name = $1
+		%s
+		GROUP BY oh.hash_value, oh.hash_type
+		HAVING COUNT(DISTINCT om.id) > 1
+		ORDER BY duplicate_count DESC
+		%s;
+	`, hashFilter, limitClause)
+
+	rows, err := r.db.Query(ctx, statement, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query duplicates within remote: %w", err)
+	}
+	defer rows.Close()
+
+	var groups []HashGroup
+	for rows.Next() {
+		var g HashGroup
+		if err := rows.Scan(&g.HashValue, &g.HashType, &g.Count); err != nil {
+			return nil, fmt.Errorf("failed to scan duplicate row: %w", err)
+		}
+		groups = append(groups, g)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating duplicate rows: %w", err)
+	}
+	return groups, nil
+}
+
+// GetFilesByHash returns all files that share the given hash value and type.
+// Use minSize=0 to return files of any size.
+func (r *ObjectRepository) GetFilesByHash(ctx context.Context, hashValue, hashType string, minSize int64) ([]FileRecord, error) {
+	statement := `
+		SELECT om.id, om.object_name, om.object_path, om.object_mime_type, om.object_size,
+		       COALESCE(rem.remote_name, ''), COALESCE(rem.hostname, '')
+		FROM object_meta om
+		JOIN object_hash_junction ohj ON om.id = ohj.object_meta_id
+		JOIN object_hash oh ON ohj.object_hash_id = oh.id
+		LEFT JOIN object_remote_junction orj ON om.id = orj.object_meta_id
+		LEFT JOIN remote rem ON orj.remote_id = rem.id
+		WHERE oh.hash_value = $1
+		  AND oh.hash_type = $2::hash_type_enum
+		  AND om.object_size >= $3;
+	`
+
+	rows, err := r.db.Query(ctx, statement, hashValue, hashType, minSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query files by hash: %w", err)
+	}
+	defer rows.Close()
+
+	var records []FileRecord
+	for rows.Next() {
+		var f FileRecord
+		if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size, &f.RemoteName, &f.Hostname); err != nil {
+			return nil, fmt.Errorf("failed to scan file record: %w", err)
+		}
+		records = append(records, f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating file records: %w", err)
+	}
+	return records, nil
 }
