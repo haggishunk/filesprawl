@@ -18,7 +18,7 @@ import (
 // using file, env vars, args
 var (
 	noOutput  = false
-	url       = "http://localhost:5572/operations/list"
+	baseURL   = "http://localhost:5572"
 	jsonInput = ""
 	authUser  = ""
 	authPass  = ""
@@ -39,8 +39,9 @@ func errorf(status int, path string, format string, arg ...any) (out rc.Params, 
 
 func doCall(ctx context.Context, path string, in rc.Params) (out rc.Params, err error) {
 	client := fshttp.NewClient(ctx)
+	requestURL := strings.TrimRight(baseURL, "/") + "/" + strings.TrimLeft(path, "/")
 
-	// fmt.Printf("Calling path: %s\n", url)
+	// fmt.Printf("Calling path: %s\n", requestURL)
 
 	// fmt.Printf("With params: %s", in)
 
@@ -49,7 +50,7 @@ func doCall(ctx context.Context, path string, in rc.Params) (out rc.Params, err 
 		return errorf(http.StatusBadRequest, path, "failed to encode request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(data))
+	req, err := http.NewRequestWithContext(ctx, "POST", requestURL, bytes.NewBuffer(data))
 	if err != nil {
 		return errorf(http.StatusInternalServerError, path, "failed to make request: %w", err)
 	}
@@ -73,7 +74,7 @@ func doCall(ctx context.Context, path string, in rc.Params) (out rc.Params, err 
 	body, err = io.ReadAll(resp.Body)
 	bodyString = strings.TrimSpace(string(body))
 	if err != nil {
-		return errorf(resp.StatusCode, "failed to read rc response: %s: %s", resp.Status, bodyString)
+		return errorf(resp.StatusCode, path, "failed to read rc response: %s: %s", resp.Status, bodyString)
 	}
 
 	// Parse output

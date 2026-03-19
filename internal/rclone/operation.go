@@ -3,6 +3,8 @@ package rclone
 import (
 	"context"
 	"fmt"
+
+	"github.com/rclone/rclone/fs/rc"
 )
 
 // ListJSON queries an rc server for objects
@@ -31,6 +33,24 @@ func ListJSON(ctx context.Context, lc ListConfig) (*ListResponse, error) {
 	err = EncodeListResponse(out, &lr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode list response: %w", err)
+	}
+	return &lr, nil
+}
+
+// ListRemotes queries an rc server for configured remotes.
+func ListRemotes(ctx context.Context) (*ListRemotesResponse, error) {
+	out, callErr := doCall(ctx, "config/listremotes", rc.Params{})
+	if callErr != nil {
+		return nil, fmt.Errorf("failed to list remotes: %w", callErr)
+	}
+
+	var lr = ListRemotesResponse{}
+	if out == nil {
+		return &lr, nil
+	}
+	err := EncodeListRemotesResponse(out, &lr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode remote list response: %w", err)
 	}
 	return &lr, nil
 }
