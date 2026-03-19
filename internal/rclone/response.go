@@ -28,9 +28,24 @@ type ListResponse struct {
 	List []ListResponseItem `json:"list"`
 }
 
+// ListRemotesResponse structifies the response from rc config/listremotes.
+type ListRemotesResponse struct {
+	Remotes []string `json:"remotes"`
+}
+
 // EncodeListResponse takes a generic return from rc calls and
 // encodes into a ListReponse struct
 func EncodeListResponse(rcp rc.Params, lr *ListResponse) error {
+	err := mapstructure.Decode(rcp, &lr)
+	if err != nil {
+		return fmt.Errorf("failed to map structure")
+	}
+	return nil
+}
+
+// EncodeListRemotesResponse takes a generic return from rc calls and
+// encodes it into a ListRemotesResponse struct.
+func EncodeListRemotesResponse(rcp rc.Params, lr *ListRemotesResponse) error {
 	err := mapstructure.Decode(rcp, &lr)
 	if err != nil {
 		return fmt.Errorf("failed to map structure")

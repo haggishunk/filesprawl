@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/haggishunk/filesprawl/internal/database"
+	"github.com/haggishunk/filesprawl/internal/rclone"
+	"github.com/haggishunk/filesprawl/internal/remote"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -186,3 +188,66 @@ func TestIntegration_GetFilesByHash_MinSizeFilter(t *testing.T) {
 	}
 }
 
+func TestIntegration_PersistResult_PersistsRemoteAssociations(t *testing.T) {
+	pool := openTestDB(t)
+	repo := NewObjectRepository(database.NewPgxDatabase(pool))
+	ctx := context.Background()
+
+	stamp := time.Now().Format("150405.000")
+	remoteName := "integ_remote_" + stamp + ":"
+	rem := remote.NewRemote("integ-host", remoteName)
+
+	item1 := rclone.ListResponseItem{
+		Name:     "a.txt",
+		Path:     "/integ/" + stamp + "/a.txt",
+		MimeType: "text/plain",
+		Size:     512,
+		Hashes:   map[string]string{"md5": "integ-remote-hash-a-" + stamp},
+	}
+	item2 := rclone.ListResponseItem{
+		Name:     "b.txt",
+		Path:     "/integ/" + stamp + "/b.txt",
+		MimeType: "text/plain",
+		Size:     512,
+		Hashes:   map[string]string{"md5": "integ-remote-hash-b-" + stamp},
+	}
+
+	defer func() {
+		repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE remote_id = $1`, rem.Id)
+		repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_meta_id IN (SELECT id FROM object_meta WHERE object_path = $1 OR object_path = $2)`, item1.Path, item2.Path)
+		repo.db.Exec(ctx, `DELETE FROM object_meta WHERE object_path = $1 OR object_path = $2`, item1.Path, item2.Path)
+		repo.db.Exec(ctx, `DELETE FROM object_hash WHERE hash_value = $1 OR hash_value = $2`, item1.Hashes["md5"], item2.Hashes["md5"])
+		repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, rem.Id)
+	}()
+
+	if err := repo.PersistResult(ctx, &rem, item1); err != nil {
+		t.Fatalf("PersistResult item1: %v", err)
+	}
+	if err := repo.PersistResult(ctx, &rem, item2); err != nil {
+		t.Fatalf("PersistResult item2: %v", err)
+	}
+
+	var remoteCount int
+	err := repo.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM remote WHERE remote_name = $1 AND hostname = $2 AND remote_type = $3`,
+		rem.Name, rem.Hostname, rem.Type,
+	).Scan(&remoteCount)
+	if err != nil {
+		t.Fatalf("count remote rows: %v", err)
+	}
+	if remoteCount != 1 {
+		t.Fatalf("expected 1 remote row, got %d", remoteCount)
+	}
+
+	var linkCount int
+	err = repo.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM object_remote_junction WHERE remote_id = $1`,
+		rem.Id,
+	).Scan(&linkCount)
+	if err != nil {
+		t.Fatalf("count remote links: %v", err)
+	}
+	if linkCount != 2 {
+		t.Fatalf("expected 2 object_remote_junction rows, got %d", linkCount)
+	}
+}

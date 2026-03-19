@@ -85,7 +85,7 @@ func Scan(ctx context.Context, s *Scanner, lc rclone.ListConfig) error {
 		// do files iteration and persistence
 		for _, lri := range lr.List {
 			fmt.Printf("Found file: %s\n", lri)
-			err := s.Repo.PersistResult(ctx, lri)
+			err := s.Repo.PersistResult(ctx, s.Remote, lri)
 			if err != nil {
 				return fmt.Errorf("failed to persist: %w", err)
 			}

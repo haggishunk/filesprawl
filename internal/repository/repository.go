@@ -7,6 +7,7 @@ import (
 	"github.com/haggishunk/filesprawl/internal/database"
 	"github.com/haggishunk/filesprawl/internal/object"
 	"github.com/haggishunk/filesprawl/internal/rclone"
+	"github.com/haggishunk/filesprawl/internal/remote"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -200,7 +201,121 @@ func (r *ObjectRepository) WriteMetaHashJunction(ctx context.Context, mhj *objec
 	return nil
 }
 
-func (r *ObjectRepository) PersistResult(ctx context.Context, lri rclone.ListResponseItem) error {
+func (r *ObjectRepository) ReadRemote(ctx context.Context, rem *remote.Remote) error {
+	var id int
+	var remoteType string
+
+	statement := `
+		SELECT id, remote_type
+		FROM remote
+		WHERE remote_name = $1 AND hostname = $2 AND remote_type = $3;
+	`
+
+	row := r.db.QueryRow(ctx, statement, rem.Name, rem.Hostname, rem.Type)
+	err := row.Scan(&id, &remoteType)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			fmt.Printf("No remote found in db.\n")
+			return nil
+		}
+		return fmt.Errorf("failed to retrieve remote: %w", err)
+	}
+
+	rem.Id = id
+	rem.Type = remoteType
+	rem.Persisted = true
+	return nil
+}
+
+func (r *ObjectRepository) WriteRemote(ctx context.Context, rem *remote.Remote) error {
+	var id int
+
+	statement := `
+		INSERT INTO remote (remote_name, remote_type, hostname)
+		VALUES ($1, $2, $3)
+		RETURNING id;
+	`
+
+	row := r.db.QueryRow(ctx, statement, rem.Name, rem.Type, rem.Hostname)
+	err := row.Scan(&id)
+	if err != nil {
+		return fmt.Errorf("failed to persist remote: %w", err)
+	}
+
+	rem.Id = id
+	rem.Persisted = true
+	return nil
+}
+
+func (r *ObjectRepository) ReadObjectRemoteJunction(ctx context.Context, orj *object.ObjectRemoteJunction) error {
+	var id int
+
+	statement := `
+		SELECT id
+		FROM object_remote_junction
+		WHERE object_meta_id = $1 AND remote_id = $2;
+	`
+
+	row := r.db.QueryRow(ctx, statement, orj.MetaId, orj.RemoteId)
+	err := row.Scan(&id)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			fmt.Printf("No object-remote junction found in db.\n")
+			return nil
+		}
+		return fmt.Errorf("failed to retrieve object remote junction: %w", err)
+	}
+
+	orj.Id = id
+	orj.Persisted = true
+	return nil
+}
+
+func (r *ObjectRepository) WriteObjectRemoteJunction(ctx context.Context, orj *object.ObjectRemoteJunction) error {
+	var id int
+
+	statement := `
+		INSERT INTO object_remote_junction (object_meta_id, remote_id)
+		VALUES ($1, $2)
+		RETURNING id;
+	`
+
+	row := r.db.QueryRow(ctx, statement, orj.MetaId, orj.RemoteId)
+	err := row.Scan(&id)
+	if err != nil {
+		return fmt.Errorf("failed to persist object remote junction: %w", err)
+	}
+
+	orj.Id = id
+	orj.Persisted = true
+	return nil
+}
+
+func (r *ObjectRepository) ensureRemote(ctx context.Context, rem *remote.Remote) error {
+	if rem == nil {
+		return fmt.Errorf("remote is required")
+	}
+	if rem.Persisted {
+		return nil
+	}
+
+	err := r.ReadRemote(ctx, rem)
+	if err != nil {
+		return fmt.Errorf("failed to get remote from db: %w", err)
+	}
+	if rem.Persisted {
+		return nil
+	}
+
+	err = r.WriteRemote(ctx, rem)
+	if err != nil {
+		return fmt.Errorf("failed to put remote into db: %w", err)
+	}
+
+	return nil
+}
+
+func (r *ObjectRepository) PersistResult(ctx context.Context, rem *remote.Remote, lri rclone.ListResponseItem) error {
 	// get or set object meta
 	m := object.NewMeta(lri.Name, lri.Path, lri.MimeType, object.WithMetaSize(lri.Size))
 	fmt.Printf("Found object meta: %s\n", m)
@@ -217,6 +332,28 @@ func (r *ObjectRepository) PersistResult(ctx context.Context, lri rclone.ListRes
 			return fmt.Errorf("failed to put object into db: %w", err)
 		}
 		fmt.Printf("as %d\n", m.Id)
+	}
+
+	err = r.ensureRemote(ctx, rem)
+	if err != nil {
+		return err
+	}
+
+	orj := object.NewObjectRemoteJunction(m.Id, rem.Id)
+	fmt.Printf("Found object-remote junction: %+v\n", orj)
+	err = r.ReadObjectRemoteJunction(ctx, &orj)
+	if err != nil {
+		return fmt.Errorf("failed to get object remote junction from db: %w", err)
+	}
+	if orj.Persisted {
+		fmt.Printf("Read object remote junction id: %d\n", orj.Id)
+	} else {
+		fmt.Printf("Persisting object-remote junction...  ")
+		err = r.WriteObjectRemoteJunction(ctx, &orj)
+		if err != nil {
+			return fmt.Errorf("failed to set object remote junction in db: %w", err)
+		}
+		fmt.Printf("as id: %d\n", orj.Id)
 	}
 
 	// get or set hash
