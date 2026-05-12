@@ -16,6 +16,44 @@ example workflow:
 
 `index` also requires `DATABASE_URL` to be set so scan results can be persisted with the local host name and the selected local rclone remote name.
 
+## finding duplicates
+
+once indexed, you can find duplicate files:
+
+### within a specific remote
+
+```bash
+filesprawl duplicates --remote media
+```
+
+### across all remotes
+
+```bash
+filesprawl duplicates --across-remotes
+```
+
+### with filters
+
+```bash
+# find duplicates larger than 10MB
+filesprawl duplicates --remote media --min-size 10485760
+
+# find duplicates using specific hash type
+filesprawl duplicates --across-remotes --hash-type sha256
+
+# limit results and use pagination
+filesprawl duplicates --across-remotes --limit 20 --offset 0
+
+# combine filters
+filesprawl duplicates --remote media --hash-type dropbox --min-size 1000000 --limit 10
+```
+
+available filters:
+- `--hash-type`: filter by hash type (md5, sha1, sha256, dropbox)
+- `--min-size`: minimum file size in bytes
+- `--limit`: maximum number of duplicate groups to return
+- `--offset`: skip this many duplicate groups (for pagination)
+
 with this index we can determine the following:
 
 - duplicates between remote storage locations
