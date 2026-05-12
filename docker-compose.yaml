@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: filesprawl
+      POSTGRES_USER: sprawler
+      POSTGRES_PASSWORD: test-only
+    ports:
+    - 5432:5432
+    volumes:
+    - $PWD/db/init/:/docker-entrypoint-initdb.d/:ro
+    - $PWD/db/data:$HOME/.local/share/filesprawl/postgres
+    networks:
+    - postgres
+
+  psql:
+    image: postgres:latest
+    environment:
+      PG_DATABASE: filesprawl
+      PG_USERNAME: sprawler
+      PG_PASSWORD: test-only
+    command: ["psql"]
+    networks:
+    - postgres
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+    - PGADMIN_DEFAULT_EMAIL=admin@example.com
+    - PGADMIN_DEFAULT_PASSWORD=adminpassword
+    ports:
+    - "8080:80"
+    volumes:
+    - pgadmin:/var/lib/pgadmin
+    networks:
+    - postgres
+    depends_on:
+    - postgres
+
+volumes:
+  pgadmin: {}
+
+networks:
+  postgres: {}
