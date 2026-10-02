@@ -2,19 +2,31 @@
 
 ## indexing
 
-first job is to index all object and remote drive storage files
+filesprawl indexes files from remote storage locations and local filesystems to identify duplicates and optimize storage usage.
+
+### Remote Storage Indexing
 
 filesprawl assumes it is talking to a **local** rclone `rcd` session on `http://localhost:5572`, and that the remote names you pass on the CLI are the locally configured rclone remote names visible to that `rcd` session.
 
-example workflow:
+example workflow for remote indexing:
 
-- `filesprawl list-remotes`
-- `filesprawl index --remote media`
-- `filesprawl index --remote media --path code/flux`
+- `filesprawl list-remotes` — List available rclone remotes
+- `filesprawl index --remote media` — Index entire remote
+- `filesprawl index --remote media --path code/flux` — Index specific path within remote
 
 `list-remotes` prints the local rclone remote names as configured. `index --remote` accepts either `media` or `media:` and normalizes that name before persisting it.
 
-`index` also requires `DATABASE_URL` to be set so scan results can be persisted with the local host name and the selected local rclone remote name.
+All indexing commands require `DATABASE_URL` to be set so scan results can be persisted with the local host name and the selected remote name.
+
+### Local File Indexing
+
+You can also index local filesystem paths:
+
+```bash
+filesprawl scan-local /path/to/local/directory
+```
+
+Local files are indexed using direct filesystem operations (not through rclone) and participate in the same duplicate detection as remote files.
 
 ## finding duplicates
 
@@ -62,7 +74,55 @@ with this index we can determine the following:
 
 ## locality interface
 
-rclone is great for configuring remote storage locations but we need a way to configure a mapping to local storage locations.  this interface configuration could be stored in a known location in the remote with optional local overrides for user (system is out of scope).
+The locality interface maps remote storage paths to local filesystem paths, enabling you to understand where remote files correspond to on your local system.
+
+### Path Resolution
+
+Resolve remote paths to local paths:
+
+```bash
+filesprawl locality resolve-remote /documents/report.pdf
+# Output: Remote: /documents/report.pdf
+#         Local:  /home/user/Documents/report.pdf
+```
+
+Resolve local paths to remote paths:
+
+```bash
+filesprawl locality resolve-local /home/user/Documents/report.pdf
+# Output: Local: /home/user/Documents/report.pdf
+#         Remote paths:
+#           - /documents/report.pdf
+```
+
+### Configuration
+
+Locality configuration uses JSON and supports pattern-based mappings:
+
+```json
+{
+  "rules": [
+    {
+      "remotePattern": "/documents",
+      "localPattern": "/home/user/Documents",
+      "priority": 1
+    },
+    {
+      "remotePattern": "/data/{category}/*",
+      "localPattern": "/home/user/{category}/*",
+      "priority": 2
+    }
+  ]
+}
+```
+
+View your current configuration:
+
+```bash
+filesprawl locality show-config
+```
+
+Configuration can be stored locally in `~/.filesprawl/locality.json` with support for remote overrides.
 
 ## cost savings
 

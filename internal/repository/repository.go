@@ -397,6 +397,90 @@ func (r *ObjectRepository) PersistResult(ctx context.Context, rem *remote.Remote
 	return nil
 }
 
+// PersistLocalResult persists a local file scan result to the database
+func (r *ObjectRepository) PersistLocalResult(ctx context.Context, rem *remote.Remote, m *object.Meta, hashes map[string]string) error {
+	// Persist metadata
+	fmt.Printf("Found local object meta: %s\n", m)
+	err := r.ReadMeta(ctx, m)
+	if err != nil {
+		return fmt.Errorf("failed to get object meta from db: %w", err)
+	}
+	if m.Persisted {
+		fmt.Printf("Read object meta id: %d\n", m.Id)
+	} else {
+		fmt.Printf("Persisting local meta...  ")
+		err = r.WriteMeta(ctx, m)
+		if err != nil {
+			return fmt.Errorf("failed to persist local object meta: %w", err)
+		}
+		fmt.Printf("as %d\n", m.Id)
+	}
+
+	// Ensure remote (local type)
+	err = r.ensureRemote(ctx, rem)
+	if err != nil {
+		return err
+	}
+
+	// Persist object-remote junction
+	orj := object.NewObjectRemoteJunction(m.Id, rem.Id)
+	fmt.Printf("Found local object-remote junction: %+v\n", orj)
+	err = r.ReadObjectRemoteJunction(ctx, &orj)
+	if err != nil {
+		return fmt.Errorf("failed to get object remote junction from db: %w", err)
+	}
+	if orj.Persisted {
+		fmt.Printf("Read object remote junction id: %d\n", orj.Id)
+	} else {
+		fmt.Printf("Persisting local object-remote junction...  ")
+		err = r.WriteObjectRemoteJunction(ctx, &orj)
+		if err != nil {
+			return fmt.Errorf("failed to persist local object remote junction: %w", err)
+		}
+		fmt.Printf("as id: %d\n", orj.Id)
+	}
+
+	// Persist hashes
+	for hType, hVal := range hashes {
+		h := object.NewHash(hVal, hType)
+		fmt.Printf("Found local hash: %s\n", h)
+
+		err := r.ReadHash(ctx, &h)
+		if err != nil {
+			return fmt.Errorf("failed to get hash from db: %w", err)
+		}
+		if h.Persisted {
+			fmt.Printf("Read hash id: %d\n", h.Id)
+		} else {
+			fmt.Printf("Persisting local hash...  ")
+			err = r.WriteHash(ctx, &h)
+			if err != nil {
+				return fmt.Errorf("failed to persist local hash: %w", err)
+			}
+			fmt.Printf("as %d\n", h.Id)
+		}
+
+		// Persist meta-hash junction
+		mhj := object.NewMetaHashJunction(m.Id, h.Id)
+		fmt.Printf("Found local meta-hash junction: %s\n", mhj)
+		err = r.ReadMetaHashJunction(ctx, &mhj)
+		if err != nil {
+			return fmt.Errorf("failed to get meta-hash junction from db: %w", err)
+		}
+		if mhj.Persisted {
+			fmt.Printf("Read meta-hash junction id: %d\n", mhj.Id)
+		} else {
+			fmt.Printf("Persisting local meta-hash junction...  ")
+			err = r.WriteMetaHashJunction(ctx, &mhj)
+			if err != nil {
+				return fmt.Errorf("failed to persist local meta-hash junction: %w", err)
+			}
+			fmt.Printf("as id: %d\n", mhj.Id)
+		}
+	}
+	return nil
+}
+
 // FindDuplicatesAcrossRemotes returns hashes that are shared by more than one
 // file across all remotes. Optionally filter by hashType (empty = all types).
 // Use limit=0 and offset=0 for no pagination.
