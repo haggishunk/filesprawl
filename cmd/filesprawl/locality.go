@@ -39,7 +39,7 @@ func runResolveRemote(cmd *cobra.Command, args []string) error {
 	remotePath := args[0]
 
 	// Load configuration from default location
-	configPath := os.ExpandEnv("$HOME/.filesprawl/locality.json")
+	configPath := locality.GetDefaultConfigPath()
 	config, err := loadConfigFile(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
@@ -60,7 +60,7 @@ func runResolveLocal(cmd *cobra.Command, args []string) error {
 	localPath := args[0]
 
 	// Load configuration from default location
-	configPath := os.ExpandEnv("$HOME/.filesprawl/locality.json")
+	configPath := locality.GetDefaultConfigPath()
 	config, err := loadConfigFile(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
@@ -81,7 +81,7 @@ func runResolveLocal(cmd *cobra.Command, args []string) error {
 }
 
 func runShowConfig(cmd *cobra.Command, args []string) error {
-	configPath := os.ExpandEnv("$HOME/.filesprawl/locality.json")
+	configPath := locality.GetDefaultConfigPath()
 	config, err := loadConfigFile(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)

@@ -37,6 +37,38 @@ func (cm *ConfigManager) SetLocalConfigPath(path string) {
 	cm.localPath = path
 }
 
+// GetDefaultConfigPath returns the default configuration file path.
+// Priority: FILESPRAWL_LOCALITY_CONFIG env var > $HOME/.config/filesprawl/locality.json > $HOME/.filesprawl/locality.json
+func GetDefaultConfigPath() string {
+	// Check environment variable
+	if envPath := os.Getenv("FILESPRAWL_LOCALITY_CONFIG"); envPath != "" {
+		return envPath
+	}
+
+	// Try XDG Base Directory spec
+	if configHome := os.Getenv("XDG_CONFIG_HOME"); configHome != "" {
+		xdgPath := filepath.Join(configHome, "filesprawl", "locality.json")
+		if _, err := os.Stat(xdgPath); err == nil {
+			return xdgPath
+		}
+	}
+
+	// Try default XDG location
+	home, _ := os.UserHomeDir()
+	if home != "" {
+		xdgDefaultPath := filepath.Join(home, ".config", "filesprawl", "locality.json")
+		if _, err := os.Stat(xdgDefaultPath); err == nil {
+			return xdgDefaultPath
+		}
+
+		// Fall back to legacy location
+		legacyPath := filepath.Join(home, ".filesprawl", "locality.json")
+		return legacyPath
+	}
+
+	return "locality.json"
+}
+
 // LoadConfig loads configuration from local file and/or remote
 // Priority: local override > remote > empty config
 func (cm *ConfigManager) LoadConfig(ctx context.Context) (Config, error) {

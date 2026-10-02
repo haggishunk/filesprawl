@@ -122,7 +122,12 @@ View your current configuration:
 filesprawl locality show-config
 ```
 
-Configuration can be stored locally in `~/.filesprawl/locality.json` with support for remote overrides.
+Configuration is loaded from (in priority order):
+1. `FILESPRAWL_LOCALITY_CONFIG` environment variable
+2. `$HOME/.config/filesprawl/locality.json` (XDG Base Directory)
+3. `$HOME/.filesprawl/locality.json` (legacy location)
+
+See [LOCALITY_CONFIG.md](LOCALITY_CONFIG.md) for complete configuration documentation.
 
 ## cost savings
 
