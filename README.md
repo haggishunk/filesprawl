@@ -111,9 +111,34 @@ Locality configuration uses JSON and supports pattern-based mappings:
       "remotePattern": "/data/{category}/*",
       "localPattern": "/home/user/{category}/*",
       "priority": 2
+    },
+    {
+      "remotePattern": "/photos/*",
+      "localPattern": "/backup/s3-photos/*",
+      "remoteName": "s3-prod",
+      "priority": 10
+    },
+    {
+      "remotePattern": "/archive/\\d{4}/\\d{2}/.*",
+      "localPattern": "/backup/archive",
+      "remoteRegex": "s3-.*",
+      "isRegex": true,
+      "priority": 5
     }
   ]
 }
+```
+
+Rules can be scoped to a single remote (`remoteName`) or to remotes matching a
+regular expression (`remoteRegex`), and path patterns can themselves be regular
+expressions when `isRegex` is set. Pass the remote name when resolving so that
+remote-scoped rules apply:
+
+```bash
+filesprawl locality resolve-remote --remote s3-prod /photos/cat.jpg
+# Output: Remote name: s3-prod
+#         Remote: /photos/cat.jpg
+#         Local:  /backup/s3-photos/cat.jpg
 ```
 
 View your current configuration:

@@ -12,10 +12,10 @@ import (
 
 // ConfigManager loads and caches locality configuration
 type ConfigManager struct {
-	cache       *cachedConfig
-	cacheTTL    time.Duration
-	localPath   string // Path to local .filesprawl/locality.json override
-	mu          sync.RWMutex
+	cache     *cachedConfig
+	cacheTTL  time.Duration
+	localPath string // Path to local .filesprawl/locality.json override
+	mu        sync.RWMutex
 }
 
 type cachedConfig struct {
@@ -117,6 +117,10 @@ func LoadConfigFromFile(path string) (Config, error) {
 	var config Config
 	if err := json.Unmarshal(data, &config); err != nil {
 		return Config{}, fmt.Errorf("failed to parse config file %s: %w", path, err)
+	}
+
+	if err := ValidateConfig(config); err != nil {
+		return Config{}, fmt.Errorf("invalid config file %s: %w", path, err)
 	}
 
 	return config, nil

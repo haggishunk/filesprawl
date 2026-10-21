@@ -75,3 +75,52 @@ The system SHALL cache locality configuration to minimize remote reads.
 - **WHEN** cached configuration exceeds time-to-live
 - **THEN** configuration is re-read from remote
 
+
+
+### Requirement: Remote-Scoped Mapping Rules
+The system SHALL support restricting mapping rules to specific remotes by exact name or name pattern.
+
+#### Scenario: Exact remote scoping
+- **WHEN** a rule declares `remoteName` and resolution provides a matching remote name
+- **THEN** the rule participates in resolution for that remote
+
+#### Scenario: Regex remote scoping
+- **WHEN** a rule declares `remoteRegex` and the provided remote name matches the expression
+- **THEN** the rule participates in resolution for that remote
+
+#### Scenario: Unscoped resolution skips scoped rules
+- **WHEN** resolution is requested without a remote name
+- **THEN** only rules without remote constraints are evaluated
+
+#### Scenario: Mutually exclusive scope fields
+- **WHEN** a rule declares both `remoteName` and `remoteRegex`
+- **THEN** configuration validation rejects the rule
+
+### Requirement: Regex Path Patterns
+The system SHALL support rules whose path patterns are regular expressions when `isRegex` is true.
+
+#### Scenario: Regex matching
+- **WHEN** a rule sets `isRegex` and the path matches the anchored regular expression
+- **THEN** the rule matches and the opposite pattern is returned unchanged
+
+#### Scenario: Invalid regex rejected
+- **WHEN** a rule sets `isRegex` with a pattern that does not compile
+- **THEN** configuration validation rejects the rule
+
+### Requirement: Rule Evaluation Order
+The system SHALL evaluate applicable rules in descending priority order.
+
+#### Scenario: Higher priority wins
+- **WHEN** multiple applicable rules match a path
+- **THEN** the rule with the highest priority is applied
+
+#### Scenario: Stable order for equal priority
+- **WHEN** applicable rules share the same priority
+- **THEN** they are evaluated in their configured order
+
+### Requirement: Configuration Validation
+The system SHALL validate locality configuration when it is loaded from a file.
+
+#### Scenario: Invalid configuration rejected
+- **WHEN** a configuration file contains a malformed rule
+- **THEN** loading fails with an error identifying the offending rule

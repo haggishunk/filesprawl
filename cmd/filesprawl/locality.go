@@ -15,6 +15,8 @@ var localityCmd = &cobra.Command{
 local filesystem paths.`,
 }
 
+var localityRemoteName string
+
 var resolvRemoteCmd = &cobra.Command{
 	Use:   "resolve-remote",
 	Short: "Resolve a remote path to local path",
@@ -46,11 +48,14 @@ func runResolveRemote(cmd *cobra.Command, args []string) error {
 	}
 
 	mapper := locality.NewMapper(config)
-	localPath, err := mapper.RemoteToLocal(remotePath)
+	localPath, err := mapper.RemoteToLocal(localityRemoteName, remotePath)
 	if err != nil {
 		return err
 	}
 
+	if localityRemoteName != "" {
+		fmt.Printf("Remote name: %s\n", localityRemoteName)
+	}
 	fmt.Printf("Remote: %s\n", remotePath)
 	fmt.Printf("Local:  %s\n", localPath)
 	return nil
@@ -67,11 +72,14 @@ func runResolveLocal(cmd *cobra.Command, args []string) error {
 	}
 
 	mapper := locality.NewMapper(config)
-	remotePaths, err := mapper.LocalToRemote(localPath)
+	remotePaths, err := mapper.LocalToRemote(localityRemoteName, localPath)
 	if err != nil {
 		return err
 	}
 
+	if localityRemoteName != "" {
+		fmt.Printf("Remote name: %s\n", localityRemoteName)
+	}
 	fmt.Printf("Local: %s\n", localPath)
 	fmt.Println("Remote paths:")
 	for _, rp := range remotePaths {
@@ -90,8 +98,19 @@ func runShowConfig(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Locality Configuration: %s\n", configPath)
 	fmt.Printf("Rules: %d\n", len(config.Rules))
 	for i, rule := range config.Rules {
-		fmt.Printf("  [%d] %s -> %s (priority: %d)\n",
-			i+1, rule.RemotePattern, rule.LocalPattern, rule.Priority)
+		scope := "any remote"
+		switch {
+		case rule.RemoteName != "":
+			scope = "remote: " + rule.RemoteName
+		case rule.RemoteRegex != "":
+			scope = "remote regex: " + rule.RemoteRegex
+		}
+		kind := "pattern"
+		if rule.IsRegex {
+			kind = "regex"
+		}
+		fmt.Printf("  [%d] %s -> %s (priority: %d, %s, %s)\n",
+			i+1, rule.RemotePattern, rule.LocalPattern, rule.Priority, scope, kind)
 	}
 	return nil
 }
@@ -108,4 +127,7 @@ func loadConfigFile(path string) (locality.Config, error) {
 func init() {
 	rootCmd.AddCommand(localityCmd)
 	localityCmd.AddCommand(resolvRemoteCmd, resolveLocalCmd, showConfigCmd)
+
+	resolvRemoteCmd.Flags().StringVar(&localityRemoteName, "remote", "", "Remote name used to select remote-specific rules")
+	resolveLocalCmd.Flags().StringVar(&localityRemoteName, "remote", "", "Remote name used to select remote-specific rules")
 }
