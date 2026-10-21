@@ -43,6 +43,19 @@ The system searches for configuration in this priority order:
       "priority": 20
     },
     {
+      "remotePattern": "/photos/*",
+      "localPattern": "/backup/s3-photos/*",
+      "remoteName": "s3-prod",
+      "priority": 30
+    },
+    {
+      "remotePattern": "/archive/\\d{4}/\\d{2}/.*",
+      "localPattern": "/backup/archive",
+      "remoteRegex": "s3-.*",
+      "isRegex": true,
+      "priority": 25
+    },
+    {
       "remotePattern": "/*",
       "localPattern": "/mnt/backup/*",
       "priority": 1
@@ -50,6 +63,19 @@ The system searches for configuration in this priority order:
   ]
 }
 ```
+
+### Rule Fields
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `remotePattern` | yes | Pattern matched against remote paths |
+| `localPattern` | yes | Pattern matched against local paths |
+| `remoteName` | no | Restrict the rule to a single remote, matched exactly |
+| `remoteRegex` | no | Restrict the rule to remotes whose name matches this regex |
+| `isRegex` | no | Treat `remotePattern` and `localPattern` as regular expressions |
+| `priority` | no | Higher values are evaluated first (default `0`) |
+
+`remoteName` and `remoteRegex` are mutually exclusive.
 
 ## Creating a Configuration File
 
@@ -92,6 +118,28 @@ Rules are evaluated in priority order (highest first):
 - `remotePattern: "/{category}/files"` captures `documents` in `/documents/files`
 - `localPattern: "/home/user/{category}"` expands to `/home/user/documents`
 
+**Regular expressions:** set `"isRegex": true` to match paths with a regex
+- Patterns are anchored, so they must match the whole path
+- `remotePattern: "/archive/\\d{4}/\\d{2}/.*"` matches `/archive/2026/10/report.pdf`
+- The opposite pattern is returned unchanged; regex rules do not substitute captures
+
+## Remote-Specific Rules
+
+A rule applies to every remote unless it declares a remote constraint:
+
+- `remoteName` — the rule applies only when the remote name matches exactly
+- `remoteRegex` — the rule applies only when the remote name matches the regex
+
+Pass the remote name on the command line so these rules are considered:
+
+```bash
+filesprawl locality resolve-remote --remote s3-prod /photos/cat.jpg
+filesprawl locality resolve-local --remote s3-prod /backup/s3-photos/cat.jpg
+```
+
+When `--remote` is omitted, remote-scoped rules are skipped and only unscoped
+rules are evaluated.
+
 ## Environment Variables
 
 ### FILESPRAWL_LOCALITY_CONFIG
@@ -126,8 +174,9 @@ filesprawl locality show-config
 
 ### Path not mapping
 - Check rule priority (higher number = checked first)
-- Verify pattern syntax (wildcards and variables)
-- Use `show-config` to inspect loaded rules
+- Verify pattern syntax (wildcards, variables, and regex)
+- Pass `--remote <name>` if the rule uses `remoteName` or `remoteRegex`
+- Use `show-config` to inspect loaded rules, their scope, and their pattern type
 
 ### Invalid JSON
 Error message will indicate parsing failure. Validate JSON:

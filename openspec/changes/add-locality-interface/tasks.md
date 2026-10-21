@@ -27,3 +27,13 @@
 - [ ] 4.4 Add integration tests
 - [ ] 4.5 Update documentation
 
+
+## 5. Remote Scoping and Regex Patterns
+- [x] 5.1 Add `remoteName`/`remoteRegex` remote scoping to mapping rules (mutually exclusive)
+- [x] 5.2 Add `isRegex` regex path pattern support with anchored, cached compilation
+- [x] 5.3 Evaluate applicable rules in descending priority order
+- [x] 5.4 Validate configuration on load with clear per-rule errors
+- [x] 5.5 Add `--remote` flag to locality resolve commands and show scope/type in show-config
+- [x] 5.6 Add unit and CLI tests for scoping, regex, priority ordering, and validation
+- [x] 5.7 Document remote-scoped and regex rules in LOCALITY_CONFIG.md and README.md
+
