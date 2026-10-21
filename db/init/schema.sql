@@ -20,8 +20,12 @@ CREATE TABLE IF NOT EXISTS object_meta (
   object_name TEXT NOT NULL,
   object_path TEXT NOT NULL,
   object_mime_type TEXT NOT NULL,
-  object_size BIGINT NOT NULL DEFAULT 0
+  object_size BIGINT NOT NULL DEFAULT 0,
+  is_symlink BOOLEAN NOT NULL DEFAULT false,
+  scan_root TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_object_meta_scan_root ON object_meta (scan_root);
 
 CREATE TABLE IF NOT EXISTS object_hash_junction (
   id SERIAL PRIMARY KEY,

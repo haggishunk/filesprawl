@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/haggishunk/filesprawl/internal/database"
+	"github.com/haggishunk/filesprawl/internal/object"
 	"github.com/haggishunk/filesprawl/internal/rclone"
 	"github.com/haggishunk/filesprawl/internal/remote"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -220,10 +221,10 @@ func TestIntegration_PersistResult_PersistsRemoteAssociations(t *testing.T) {
 		repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, rem.Id)
 	}()
 
-	if err := repo.PersistResult(ctx, &rem, item1); err != nil {
+	if err := repo.PersistResult(ctx, &rem, item1, "/integ/"+stamp); err != nil {
 		t.Fatalf("PersistResult item1: %v", err)
 	}
-	if err := repo.PersistResult(ctx, &rem, item2); err != nil {
+	if err := repo.PersistResult(ctx, &rem, item2, "/integ/"+stamp); err != nil {
 		t.Fatalf("PersistResult item2: %v", err)
 	}
 
@@ -249,5 +250,125 @@ func TestIntegration_PersistResult_PersistsRemoteAssociations(t *testing.T) {
 	}
 	if linkCount != 2 {
 		t.Fatalf("expected 2 object_remote_junction rows, got %d", linkCount)
+	}
+}
+
+func TestIntegration_PersistLocalResult_ScanRootDeduplication(t *testing.T) {
+	pool := openTestDB(t)
+	repo := NewObjectRepository(database.NewPgxDatabase(pool))
+	ctx := context.Background()
+
+	stamp := time.Now().Format("150405.000")
+	rootA := "/integ/photos-" + stamp
+	rootB := "/integ/photos-alt-" + stamp
+	remA := remote.NewRemote("integ-host", rootA, remote.WithRemoteType("local"))
+	remB := remote.NewRemote("integ-host", rootB, remote.WithRemoteType("local"))
+
+	// Same file name and content scanned under two different roots
+	hashVal := "integ-crossroot-hash-" + stamp
+	hashes := map[string]string{"md5": hashVal}
+	mA := object.NewMeta("a.jpg", "a.jpg", "image/jpeg", object.WithMetaSize(512), object.WithMetaScanRoot(rootA))
+	mB := object.NewMeta("a.jpg", "a.jpg", "image/jpeg", object.WithMetaSize(512), object.WithMetaScanRoot(rootB))
+
+	defer func() {
+		repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_meta_id IN ($1, $2)`, mA.Id, mB.Id)
+		repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE object_meta_id IN ($1, $2)`, mA.Id, mB.Id)
+		repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2)`, mA.Id, mB.Id)
+		repo.db.Exec(ctx, `DELETE FROM object_hash WHERE hash_value = $1`, hashVal)
+		repo.db.Exec(ctx, `DELETE FROM remote WHERE id IN ($1, $2)`, remA.Id, remB.Id)
+	}()
+
+	if err := repo.PersistLocalResult(ctx, &remA, &mA, hashes); err != nil {
+		t.Fatalf("persist root A: %v", err)
+	}
+	if err := repo.PersistLocalResult(ctx, &remB, &mB, hashes); err != nil {
+		t.Fatalf("persist root B: %v", err)
+	}
+
+	// Distinct records per scan root (issue #3: previously collapsed into one)
+	if mA.Id == mB.Id {
+		t.Fatalf("expected distinct meta records per scan root, both got id %d", mA.Id)
+	}
+
+	// The shared hash is now detected as a duplicate group
+	groups, err := repo.FindDuplicatesAcrossRemotes(ctx, "md5", 0, 0)
+	if err != nil {
+		t.Fatalf("find duplicates: %v", err)
+	}
+	found := false
+	for _, g := range groups {
+		if g.HashValue == hashVal && g.Count == 2 {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected cross-root duplicate group for hash %s", hashVal)
+	}
+
+	// GetFilesByHash reports scan provenance
+	records, err := repo.GetFilesByHash(ctx, hashVal, "md5", 0)
+	if err != nil {
+		t.Fatalf("get files by hash: %v", err)
+	}
+	roots := map[string]bool{}
+	for _, r := range records {
+		roots[r.ScanRoot] = true
+	}
+	if !roots[rootA] || !roots[rootB] {
+		t.Fatalf("expected scan roots %s and %s in records, got %v", rootA, rootB, roots)
+	}
+
+	// Rescanning the same root reuses the existing record (idempotent)
+	mA2 := object.NewMeta("a.jpg", "a.jpg", "image/jpeg", object.WithMetaSize(512), object.WithMetaScanRoot(rootA))
+	if err := repo.PersistLocalResult(ctx, &remA, &mA2, hashes); err != nil {
+		t.Fatalf("rescan root A: %v", err)
+	}
+	if mA2.Id != mA.Id {
+		t.Fatalf("expected rescan of same root to reuse meta id %d, got %d", mA.Id, mA2.Id)
+	}
+}
+
+func TestIntegration_PersistLocalResult_SymlinkMarked(t *testing.T) {
+	pool := openTestDB(t)
+	repo := NewObjectRepository(database.NewPgxDatabase(pool))
+	ctx := context.Background()
+
+	stamp := time.Now().Format("150405.000")
+	root := "/integ/links-" + stamp
+	rem := remote.NewRemote("integ-host", root, remote.WithRemoteType("local"))
+
+	m := object.NewMeta("link.txt", "link.txt", "application/octet-stream",
+		object.WithMetaSize(8), object.WithMetaSymlink(true), object.WithMetaScanRoot(root))
+
+	defer func() {
+		repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE object_meta_id = $1`, m.Id)
+		repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id = $1`, m.Id)
+		repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, rem.Id)
+	}()
+
+	// Symlinks are persisted without hashes
+	if err := repo.PersistLocalResult(ctx, &rem, &m, nil); err != nil {
+		t.Fatalf("persist symlink: %v", err)
+	}
+
+	var isSymlink bool
+	var scanRoot *string
+	var hashLinks int
+	err := repo.db.QueryRow(ctx,
+		`SELECT is_symlink, scan_root,
+		        (SELECT COUNT(*) FROM object_hash_junction WHERE object_meta_id = $1)
+		 FROM object_meta WHERE id = $1`, m.Id,
+	).Scan(&isSymlink, &scanRoot, &hashLinks)
+	if err != nil {
+		t.Fatalf("read back symlink row: %v", err)
+	}
+	if !isSymlink {
+		t.Fatalf("expected is_symlink=true")
+	}
+	if scanRoot == nil || *scanRoot != root {
+		t.Fatalf("expected scan_root %q, got %v", root, scanRoot)
+	}
+	if hashLinks != 0 {
+		t.Fatalf("expected no hash junctions for symlink, got %d", hashLinks)
 	}
 }

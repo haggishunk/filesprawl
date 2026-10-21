@@ -12,9 +12,13 @@ type Meta struct {
 	// BasePath represents the object store paths investigated
 	// keep these as metadata for scan result object
 	// and for freshness of scan directory targeting
-	BasePath  string
-	MimeType  string
-	Size      int64
+	BasePath string
+	MimeType string
+	Size     int64
+	// IsSymlink marks objects that are symlinks; their contents are never hashed
+	IsSymlink bool
+	// ScanRoot identifies the scan root that produced this record
+	ScanRoot  string
 	Persisted bool
 }
 
@@ -50,5 +54,19 @@ func NewMeta(n string, p string, m string, oo ...MetaOption) Meta {
 func WithMetaSize(s int64) MetaOption {
 	return func(o *Meta) {
 		o.Size = s
+	}
+}
+
+// WithMetaSymlink marks a Meta object as a symlink
+func WithMetaSymlink(is bool) MetaOption {
+	return func(o *Meta) {
+		o.IsSymlink = is
+	}
+}
+
+// WithMetaScanRoot sets the scan root that produced a Meta object
+func WithMetaScanRoot(root string) MetaOption {
+	return func(o *Meta) {
+		o.ScanRoot = root
 	}
 }

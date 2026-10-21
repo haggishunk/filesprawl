@@ -28,6 +28,8 @@ filesprawl scan-local /path/to/local/directory
 
 Local files are indexed using direct filesystem operations (not through rclone) and participate in the same duplicate detection as remote files.
 
+Symlink handling: directory symlinks are skipped, and file symlinks are recorded with `is_symlink=true` but never hashed, so a link is never reported as a duplicate of its target. Broken symlinks are logged with a warning and skipped. Every indexed file records the scan root it was found under (`scan_root`), so same-named files from different scan roots are distinct records and can be detected as duplicates.
+
 ## finding duplicates
 
 once indexed, you can find duplicate files:
@@ -128,6 +130,22 @@ Configuration is loaded from (in priority order):
 3. `$HOME/.filesprawl/locality.json` (legacy location)
 
 See [LOCALITY_CONFIG.md](LOCALITY_CONFIG.md) for complete configuration documentation.
+
+## database schema and migrations
+
+Fresh installations get the full schema from `db/init/schema.sql` (mounted into the postgres container's `/docker-entrypoint-initdb.d/`).
+
+Existing databases are upgraded with the reversible SQL migrations in `db/migrations/`:
+
+```bash
+# apply
+docker compose exec -T postgres psql -U sprawler -d filesprawl < db/migrations/0001_add_symlink_and_scan_root.up.sql
+
+# roll back
+docker compose exec -T postgres psql -U sprawler -d filesprawl < db/migrations/0001_add_symlink_and_scan_root.down.sql
+```
+
+Migration 0001 adds `is_symlink` and `scan_root` to `object_meta` and backfills `scan_root` from the linked remote name for existing rows.
 
 ## cost savings
 
