@@ -32,6 +32,8 @@ type ScanResult struct {
 type Scanner struct {
 	Remote *remote.Remote
 	Repo   *repository.ObjectRepository
+	// ScanRoot is the remote path the scan was started at
+	ScanRoot string
 	// writer channel
 }
 
@@ -56,6 +58,13 @@ func WithRemote(r *remote.Remote) ScannerOpt {
 func WithRepo(r *repository.ObjectRepository) ScannerOpt {
 	return func(s *Scanner) {
 		s.Repo = r
+	}
+}
+
+// WithScanRoot sets the remote path the scan starts from
+func WithScanRoot(root string) ScannerOpt {
+	return func(s *Scanner) {
+		s.ScanRoot = root
 	}
 }
 
@@ -85,7 +94,7 @@ func Scan(ctx context.Context, s *Scanner, lc rclone.ListConfig) error {
 		// do files iteration and persistence
 		for _, lri := range lr.List {
 			fmt.Printf("Found file: %s\n", lri)
-			err := s.Repo.PersistResult(ctx, s.Remote, lri)
+			err := s.Repo.PersistResult(ctx, s.Remote, lri, s.ScanRoot)
 			if err != nil {
 				return fmt.Errorf("failed to persist: %w", err)
 			}

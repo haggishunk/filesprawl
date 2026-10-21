@@ -29,6 +29,7 @@ type FileRecord struct {
 	Size       int64
 	RemoteName string
 	Hostname   string
+	ScanRoot   string
 }
 
 type ObjectRepository struct {
@@ -101,12 +102,12 @@ func (r *ObjectRepository) WriteMeta(ctx context.Context, m *object.Meta) error 
 	var id int
 
 	statement := `
-		INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, is_symlink, scan_root)
+		VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''))
 		RETURNING id;
 	`
 
-	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.Size)
+	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.Size, m.IsSymlink, m.ScanRoot)
 	err := row.Scan(&id)
 
 	if err != nil {
@@ -123,15 +124,18 @@ func (r *ObjectRepository) ReadMeta(ctx context.Context, m *object.Meta) error {
 	// return new or existing id
 	var id int
 	var size int64
+	var isSymlink bool
+	var scanRoot string
 
 	statement := `
-		SELECT id, object_size
+		SELECT id, object_size, is_symlink, COALESCE(scan_root, '')
 		FROM object_meta
-		WHERE object_name = $1 AND object_path = $2 AND object_mime_type = $3;
+		WHERE object_name = $1 AND object_path = $2 AND object_mime_type = $3
+		  AND scan_root IS NOT DISTINCT FROM NULLIF($4, '');
 	`
 
-	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType)
-	err := row.Scan(&id, &size)
+	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.ScanRoot)
+	err := row.Scan(&id, &size, &isSymlink, &scanRoot)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -145,6 +149,8 @@ func (r *ObjectRepository) ReadMeta(ctx context.Context, m *object.Meta) error {
 
 	m.Id = id
 	m.Size = size
+	m.IsSymlink = isSymlink
+	m.ScanRoot = scanRoot
 	m.Persisted = true
 	return nil
 }
@@ -315,9 +321,9 @@ func (r *ObjectRepository) ensureRemote(ctx context.Context, rem *remote.Remote)
 	return nil
 }
 
-func (r *ObjectRepository) PersistResult(ctx context.Context, rem *remote.Remote, lri rclone.ListResponseItem) error {
+func (r *ObjectRepository) PersistResult(ctx context.Context, rem *remote.Remote, lri rclone.ListResponseItem, scanRoot string) error {
 	// get or set object meta
-	m := object.NewMeta(lri.Name, lri.Path, lri.MimeType, object.WithMetaSize(lri.Size))
+	m := object.NewMeta(lri.Name, lri.Path, lri.MimeType, object.WithMetaSize(lri.Size), object.WithMetaScanRoot(scanRoot))
 	fmt.Printf("Found object meta: %s\n", m)
 	err := r.ReadMeta(ctx, &m)
 	if err != nil {
@@ -588,7 +594,7 @@ func (r *ObjectRepository) FindDuplicatesWithinRemote(ctx context.Context, remot
 func (r *ObjectRepository) GetFilesByHash(ctx context.Context, hashValue, hashType string, minSize int64) ([]FileRecord, error) {
 	statement := `
 		SELECT om.id, om.object_name, om.object_path, om.object_mime_type, om.object_size,
-		       COALESCE(rem.remote_name, ''), COALESCE(rem.hostname, '')
+		       COALESCE(rem.remote_name, ''), COALESCE(rem.hostname, ''), COALESCE(om.scan_root, '')
 		FROM object_meta om
 		JOIN object_hash_junction ohj ON om.id = ohj.object_meta_id
 		JOIN object_hash oh ON ohj.object_hash_id = oh.id
@@ -608,7 +614,7 @@ func (r *ObjectRepository) GetFilesByHash(ctx context.Context, hashValue, hashTy
 	var records []FileRecord
 	for rows.Next() {
 		var f FileRecord
-		if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size, &f.RemoteName, &f.Hostname); err != nil {
+		if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size, &f.RemoteName, &f.Hostname, &f.ScanRoot); err != nil {
 			return nil, fmt.Errorf("failed to scan file record: %w", err)
 		}
 		records = append(records, f)

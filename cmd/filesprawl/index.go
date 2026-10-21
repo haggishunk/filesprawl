@@ -60,6 +60,7 @@ func runIndexCmd(cmd *cobra.Command, _ []string) error {
 	scn := operation.NewScanner(
 		operation.WithRemote(&rem),
 		operation.WithRepo(repo),
+		operation.WithScanRoot(indexPath),
 	)
 
 	lo := rclone.NewListOption(rclone.ListOptionFilesOnly())

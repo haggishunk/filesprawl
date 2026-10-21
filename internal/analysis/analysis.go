@@ -30,6 +30,7 @@ type FileInfo struct {
 	Size       int64
 	RemoteName string
 	Hostname   string
+	ScanRoot   string
 }
 
 // DuplicateGroup is a set of files that share the same content hash.
@@ -100,6 +101,7 @@ func (d *DuplicateDetector) enrich(ctx context.Context, groups []repository.Hash
 				Size:       rec.Size,
 				RemoteName: rec.RemoteName,
 				Hostname:   rec.Hostname,
+				ScanRoot:   rec.ScanRoot,
 			}
 		}
 		result = append(result, DuplicateGroup{
@@ -126,7 +128,11 @@ func FormatReport(groups []DuplicateGroup) string {
 			if f.Hostname != "" {
 				remote = f.Hostname + "/" + f.RemoteName
 			}
-			fmt.Fprintf(&sb, "  • %s  [%s]  %d bytes  remote: %s\n", f.Name, f.Path, f.Size, remote)
+			root := ""
+			if f.ScanRoot != "" {
+				root = "  root: " + f.ScanRoot
+			}
+			fmt.Fprintf(&sb, "  • %s  [%s]  %d bytes  remote: %s%s\n", f.Name, f.Path, f.Size, remote, root)
 		}
 		sb.WriteString("\n")
 	}
@@ -139,4 +145,3 @@ func min(a, b int) int {
 	}
 	return b
 }
-
