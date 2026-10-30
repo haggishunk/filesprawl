@@ -3,7 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
-	"github.com/metaspartan/gotui/v5"
+
 	"github.com/haggishunk/filesprawl/internal/consolidation/browsing"
 	"github.com/haggishunk/filesprawl/internal/consolidation/flags"
 	"github.com/haggishunk/filesprawl/internal/consolidation/ui/screens"
@@ -12,9 +12,9 @@ import (
 )
 
 // ConsolidationApp orchestrates the interactive consolidation workflow
+// NOTE: Phase 5 TUI integration pending. Stub implementation for now.
 type ConsolidationApp struct {
 	ctx            context.Context
-	app            *gotui.Application
 	userRepo       users.Repository
 	flagRepo       flags.Repository
 	currentUser    *users.User
@@ -27,11 +27,8 @@ type ConsolidationApp struct {
 
 // NewConsolidationApp creates a new consolidation app
 func NewConsolidationApp(ctx context.Context, userRepo users.Repository, flagRepo flags.Repository) (*ConsolidationApp, error) {
-	app := gotui.NewApplication()
-
 	return &ConsolidationApp{
 		ctx:            ctx,
-		app:            app,
 		userRepo:       userRepo,
 		flagRepo:       flagRepo,
 		hashWidget:     widgets.NewHashCentricWidget(),
@@ -43,7 +40,7 @@ func NewConsolidationApp(ctx context.Context, userRepo users.Repository, flagRep
 // Run executes the full consolidation workflow
 func (ca *ConsolidationApp) Run(duplicateGroups []browsing.DuplicateGroup) error {
 	// Step 1: Authentication
-	authScreen := screens.NewAuthScreen(ca.app, ca.userRepo)
+	authScreen := screens.NewAuthScreen(ca.userRepo)
 	user, err := authScreen.Show(ca.ctx)
 	if err != nil {
 		return fmt.Errorf("authentication failed: %w", err)
@@ -51,7 +48,7 @@ func (ca *ConsolidationApp) Run(duplicateGroups []browsing.DuplicateGroup) error
 	ca.currentUser = user
 
 	// Step 2: Session resume check
-	sessionLoader := screens.NewSessionLoaderScreen(ca.app, ca.flagRepo, user.ID)
+	sessionLoader := screens.NewSessionLoaderScreen(ca.flagRepo, user.ID)
 	resumeSession, err := sessionLoader.Show(ca.ctx)
 	if err != nil {
 		return fmt.Errorf("session check failed: %w", err)

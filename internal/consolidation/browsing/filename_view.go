@@ -96,7 +96,7 @@ func (r *FilenameViewRenderer) renderVersionDetails(output *strings.Builder, gro
 
 		output.WriteString(fmt.Sprintf("    Version %d (hash: %s, %d location%s) %s%s\n",
 			versionNum,
-			truncateHash(version.Hash.HashValue, 6),
+			truncateHash(version.Hash.Hash, 6),
 			len(version.Locations),
 			pluralize(len(version.Locations)),
 			indicator,

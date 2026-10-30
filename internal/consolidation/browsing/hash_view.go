@@ -3,6 +3,8 @@ package browsing
 import (
 	"fmt"
 	"strings"
+
+	"github.com/haggishunk/filesprawl/internal/consolidation/flags"
 )
 
 // HashViewRenderer renders the hash-centric view
@@ -105,8 +107,8 @@ func (r *HashViewRenderer) renderGroupDetails(output *strings.Builder, group Dup
 				flagStr = fmt.Sprintf(" [%s]", fv.Flag.FlagType)
 			}
 			output.WriteString(fmt.Sprintf("      • %s @ %s%s\n",
-				fv.FileInfo.ObjectName,
-				truncatePath(fv.FileInfo.ObjectPath, 40),
+				fv.FileInfo.Name,
+				truncatePath(fv.FileInfo.Path, 40),
 				flagStr,
 			))
 		}
@@ -164,9 +166,9 @@ func truncatePath(path string, maxLen int) string {
 }
 
 // countFlags counts flagged files by type
-func countFlags(flags map[int]*flags.Flag) map[string]int {
+func countFlags(flagsMap map[int]*flags.Flag) map[string]int {
 	counts := make(map[string]int)
-	for _, flag := range flags {
+	for _, flag := range flagsMap {
 		counts[string(flag.FlagType)]++
 	}
 	return counts

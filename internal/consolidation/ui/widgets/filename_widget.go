@@ -2,16 +2,17 @@ package widgets
 
 import (
 	"fmt"
-	"github.com/metaspartan/gotui/v5"
+
 	"github.com/haggishunk/filesprawl/internal/consolidation/browsing"
 )
 
 // FilenameCentricWidget displays files grouped by filename
+// NOTE: Phase 5 TUI integration pending. Stub implementation for now.
 type FilenameCentricWidget struct {
-	list      *BaseListWidget
+	list       *BaseListWidget
 	duplicates []browsing.DuplicateGroup
 	indicators map[int]browsing.PresenceIndicator
-	analyzer  *browsing.PresenceAnalyzer
+	analyzer   *browsing.PresenceAnalyzer
 }
 
 // NewFilenameCentricWidget creates a new filename-centric browsing widget
@@ -24,8 +25,8 @@ func NewFilenameCentricWidget() *FilenameCentricWidget {
 	}
 }
 
-// GetWidget returns the underlying gotui widget
-func (w *FilenameCentricWidget) GetWidget() gotui.Drawable {
+// GetWidget returns the underlying widget
+func (w *FilenameCentricWidget) GetWidget() interface{} {
 	return w.list.GetWidget()
 }
 
@@ -144,7 +145,7 @@ func (w *FilenameCentricWidget) GetGroupDetails(index int) string {
 		indicator := w.analyzer.AnalyzeFileVersion(version)
 		detail += fmt.Sprintf("Version %d: %s (%d location%s)\n",
 			vIdx+1,
-			w.truncateHash(version.Hash.HashValue, 12),
+			w.truncateHash(version.Hash.Hash, 12),
 			len(version.Locations),
 			w.plural(len(version.Locations)),
 		)

@@ -105,7 +105,7 @@ func (vc *ViewController) HandleKeypress(key rune) (string, error) {
 		// Move cursor up
 		vc.session.MoveCursorUp()
 		return vc.RenderCurrentView(), nil
-	case 'd', 'd':
+	case 'j', 'J':
 		// Move cursor down
 		vc.session.MoveCursorDown()
 		return vc.RenderCurrentView(), nil

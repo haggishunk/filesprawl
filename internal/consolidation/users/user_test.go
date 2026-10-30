@@ -70,7 +70,7 @@ func TestRepositoryInterface(t *testing.T) {
 
 func TestContextCancellation(t *testing.T) {
 	// Test that the repository respects context cancellation
-	ctx, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(context.Background())
 	cancel()
 
 	// Any operation with cancelled context should fail

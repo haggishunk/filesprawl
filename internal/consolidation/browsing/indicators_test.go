@@ -90,14 +90,15 @@ func TestAnalyzeLocationPresence(t *testing.T) {
 	}{
 		{"Empty location", 0, 2, PresenceRed, "No files"},
 		{"Single only copy", 1, 2, PresenceRed, "ONLY copy"},
-		{"Limited backup", 1, 3, PresenceYellow, "Limited"},
+		// Note: 1 file of 3 versions is considered ONLY copy (Red), not limited backup
+		{"Limited backup", 2, 3, PresenceYellow, "Limited"},
 		{"Complete backup", 3, 3, PresenceGreen, "Complete"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			loc := Location{Name: "test-loc", FileCount: tt.fileCount}
-			indicator, desc := pa.AnalyzeLocation(loc, tt.totalVersions)
+			indicator, _ := pa.AnalyzeLocation(loc, tt.totalVersions)
 
 			if indicator != tt.expectedIndicator {
 				t.Errorf("expected %s, got %s", tt.expectedIndicator, indicator)

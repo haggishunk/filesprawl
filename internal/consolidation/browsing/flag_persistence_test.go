@@ -33,7 +33,7 @@ func TestGetOrCreateStateMachine(t *testing.T) {
 
 func TestCountByType(t *testing.T) {
 	pfm := NewPersistentFlagManager(1, nil)
-	ctx := context.Background()
+	_ = context.Background() // Not used in stub implementation
 
 	fsm1 := pfm.GetOrCreateStateMachine(1)
 	fsm1.TransitionKeep()

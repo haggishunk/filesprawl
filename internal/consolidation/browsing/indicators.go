@@ -119,7 +119,7 @@ func (pa *PresenceAnalyzer) SummarizeGroupPresence(group DuplicateGroup) string 
 	}
 
 	// Analyze each location
-	for locName, loc := range seenLocations {
+	for _, loc := range seenLocations {
 		indicator, desc := pa.AnalyzeLocation(loc, len(group.Versions))
 		output += FormatLocationPresence(loc, indicator, desc) + "\n"
 	}

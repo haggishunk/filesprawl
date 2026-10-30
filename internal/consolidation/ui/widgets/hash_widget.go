@@ -2,17 +2,17 @@ package widgets
 
 import (
 	"fmt"
-	"github.com/metaspartan/gotui/v5"
-	"github.com/metaspartan/gotui/v5/widgets"
+
 	"github.com/haggishunk/filesprawl/internal/consolidation/browsing"
 )
 
 // HashCentricWidget displays files grouped by content hash
+// NOTE: Phase 5 TUI integration pending. Stub implementation for now.
 type HashCentricWidget struct {
-	list      *BaseListWidget
+	list       *BaseListWidget
 	duplicates []browsing.DuplicateGroup
 	indicators map[int]browsing.PresenceIndicator
-	analyzer  *browsing.PresenceAnalyzer
+	analyzer   *browsing.PresenceAnalyzer
 }
 
 // NewHashCentricWidget creates a new hash-centric browsing widget
@@ -25,8 +25,8 @@ func NewHashCentricWidget() *HashCentricWidget {
 	}
 }
 
-// GetWidget returns the underlying gotui widget
-func (w *HashCentricWidget) GetWidget() gotui.Drawable {
+// GetWidget returns the underlying widget
+func (w *HashCentricWidget) GetWidget() interface{} {
 	return w.list.GetWidget()
 }
 

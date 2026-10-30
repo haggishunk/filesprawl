@@ -94,7 +94,7 @@ func TestExpandItem(t *testing.T) {
 	}
 }
 
-func TestCountByType(t *testing.T) {
+func TestSessionManagerCountByType(t *testing.T) {
 	sm := NewSessionManager(1, nil)
 
 	// Add some mock flags

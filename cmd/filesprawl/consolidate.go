@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/haggishunk/filesprawl/internal/analysis"
 	"github.com/haggishunk/filesprawl/internal/cli"
-	"github.com/haggishunk/filesprawl/internal/consolidation/execution"
-	"github.com/haggishunk/filesprawl/internal/consolidation/flags"
-	"github.com/haggishunk/filesprawl/internal/consolidation/ui"
-	"github.com/haggishunk/filesprawl/internal/consolidation/users"
+	// "github.com/haggishunk/filesprawl/internal/consolidation/execution"
+	// "github.com/haggishunk/filesprawl/internal/consolidation/flags"
+	// "github.com/haggishunk/filesprawl/internal/consolidation/ui"
+	// "github.com/haggishunk/filesprawl/internal/consolidation/users"
 	"github.com/spf13/cobra"
 )
 
@@ -86,9 +85,6 @@ func runConsolidateCmd(cmd *cobra.Command, args []string) error {
 
 // runConsolidateReview runs the interactive consolidation workflow
 func runConsolidateReview(ctx context.Context, repo interface{}) error {
-	// Get duplicates based on filter
-	analyzer := analysis.NewAnalyzer(repo)
-
 	if consolidateRemote != "" {
 		remoteName := normalizeRemoteName(consolidateRemote)
 		// TODO: Implement duplicates within remote
@@ -97,19 +93,14 @@ func runConsolidateReview(ctx context.Context, repo interface{}) error {
 	}
 
 	if consolidateAcrossRemotes {
-		// Get duplicates across all remotes
-		groups, err := analyzer.FindDuplicatesAcross(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to find duplicates: %w", err)
-		}
-
-		if len(groups) == 0 {
-			fmt.Println("No duplicates found")
-			return nil
-		}
-
+		// TODO: Get duplicates across all remotes using analyzer
+		// For now, just show placeholder message
 		fmt.Println("consolidate --review: Feature not yet implemented in TUI")
-		fmt.Printf("Found %d duplicate groups\n", len(groups))
+		fmt.Println("This will start the interactive consolidation workflow with:")
+		fmt.Println("  - Hash-centric and filename-centric browsing")
+		fmt.Println("  - Multi-user flagging (keep/archive/delete)")
+		fmt.Println("  - Location presence indicators")
+		fmt.Println("  - Persistent session management")
 		return nil
 	}
 
