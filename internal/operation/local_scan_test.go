@@ -266,7 +266,7 @@ func TestScanLocalScanRootTracking(t *testing.T) {
 	if call.meta.Path != "file.txt" {
 		t.Fatalf("expected path relative to scan root, got %q", call.meta.Path)
 	}
-	if call.rem.Name != want || call.rem.Type != "local" {
-		t.Fatalf("expected local remote named %q, got %q (%s)", want, call.rem.Name, call.rem.Type)
+	if call.rem.Name != want || !call.rem.Location.IsLocal() {
+		t.Fatalf("expected local remote named %q, got %q", want, call.rem.Name)
 	}
 }
