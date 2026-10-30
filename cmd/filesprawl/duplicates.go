@@ -15,6 +15,7 @@ var (
 	duplicatesMinSize       int64
 	duplicatesLimit         int
 	duplicatesOffset        int
+	duplicatesLargest       int
 )
 
 var duplicatesCmd = &cobra.Command{
@@ -31,6 +32,9 @@ remote or across all indexed remotes.`,
   # Find large duplicates (>10MB)
   filesprawl duplicates --remote media --min-size 10485760
 
+  # Show top 10 largest duplicate groups by file count
+  filesprawl duplicates --across-remotes --largest 10
+
   # Filter by hash type and limit results
   filesprawl duplicates --across-remotes --hash-type sha256 --limit 20`,
 	PreRunE: validateDuplicatesArgs,
@@ -44,6 +48,7 @@ func init() {
 	duplicatesCmd.Flags().Int64Var(&duplicatesMinSize, "min-size", 0, "minimum file size in bytes")
 	duplicatesCmd.Flags().IntVar(&duplicatesLimit, "limit", 0, "maximum number of duplicate groups to return")
 	duplicatesCmd.Flags().IntVar(&duplicatesOffset, "offset", 0, "skip this many duplicate groups")
+	duplicatesCmd.Flags().IntVar(&duplicatesLargest, "largest", 0, "show only the N largest duplicate groups by file count")
 
 	rootCmd.AddCommand(duplicatesCmd)
 }
@@ -73,6 +78,12 @@ func validateDuplicatesArgs(_ *cobra.Command, _ []string) error {
 	}
 	if duplicatesOffset < 0 {
 		return fmt.Errorf("offset must be non-negative, got %d", duplicatesOffset)
+	}
+	if duplicatesLargest < 0 {
+		return fmt.Errorf("largest must be non-negative, got %d", duplicatesLargest)
+	}
+	if duplicatesLargest > 0 && duplicatesLimit > 0 {
+		return fmt.Errorf("--largest and --limit are mutually exclusive")
 	}
 
 	return nil
@@ -107,6 +118,11 @@ func runDuplicatesCmd(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to find duplicates within remote %q: %w", duplicatesRemote, err)
 		}
+	}
+
+	// If --largest is specified, sort by count and keep only top N
+	if duplicatesLargest > 0 {
+		groups = analysis.GetLargestDuplicateGroups(groups, duplicatesLargest)
 	}
 
 	report := analysis.FormatReport(groups)

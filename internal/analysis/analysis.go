@@ -166,3 +166,31 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+// GetLargestDuplicateGroups returns the N largest duplicate groups by file count.
+// Groups are sorted by count in descending order.
+func GetLargestDuplicateGroups(groups []DuplicateGroup, n int) []DuplicateGroup {
+	if n <= 0 || len(groups) == 0 {
+		return []DuplicateGroup{}
+	}
+
+	// Create a copy to avoid modifying the original slice
+	sorted := make([]DuplicateGroup, len(groups))
+	copy(sorted, groups)
+
+	// Sort by Count in descending order
+	for i := 0; i < len(sorted); i++ {
+		for j := i + 1; j < len(sorted); j++ {
+			if sorted[j].Count > sorted[i].Count {
+				// Swap
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+
+	// Return only the top N
+	if n > len(sorted) {
+		n = len(sorted)
+	}
+	return sorted[:n]
+}
