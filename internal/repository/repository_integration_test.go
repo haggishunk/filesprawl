@@ -504,3 +504,106 @@ func writeMetaWithSize(t *testing.T, ctx context.Context, repo *ObjectRepository
 	}
 	return m.Id
 }
+
+// TestFindDuplicatesWithinRemote_WithHostnamePrefix tests Issue #7 fix:
+// FindDuplicatesWithinRemote should accept both "remote_name" and "hostname/remote_name" formats.
+func TestFindDuplicatesWithinRemote_WithHostnamePrefix(t *testing.T) {
+	pool := openTestDB(t)
+	repo := NewObjectRepository(database.NewPgxDatabase(pool))
+	ctx := context.Background()
+
+	// Create a remote with hostname and name
+	host := "testhost"
+	remName := "testremote"
+	rem := remote.NewRemote(host, remName)
+	remID, err := repo.WriteRemote(ctx, rem)
+	if err != nil {
+		t.Fatalf("WriteRemote failed: %v", err)
+	}
+
+	// Create duplicate files and associate with remote
+	hash := writeRaw(t, ctx, repo, "dup_hash_with_host", "md5")
+	meta1 := writeMetaRaw(t, ctx, repo, "file1.txt", "/path/file1.txt", "text/plain")
+	meta2 := writeMetaRaw(t, ctx, repo, "file2.txt", "/path/file2.txt", "text/plain")
+	writeJunctionRaw(t, ctx, repo, meta1, hash)
+	writeJunctionRaw(t, ctx, repo, meta2, hash)
+
+	// Link metadata to remote
+	if _, err := repo.db.Exec(ctx, `INSERT INTO object_remote_junction (object_meta_id, remote_id) VALUES ($1, $2), ($3, $2)`, meta1, remID, meta2); err != nil {
+		t.Fatalf("failed to link metadata to remote: %v", err)
+	}
+
+	// Test 1: Query with "hostname/remote_name" format (as shown in report)
+	groups1, err := repo.FindDuplicatesWithinRemote(ctx, host+"/"+remName, "", 0, 0)
+	if err != nil {
+		t.Fatalf("FindDuplicatesWithinRemote with hostname/name failed: %v", err)
+	}
+	if len(groups1) == 0 {
+		t.Errorf("expected duplicates with hostname/name format, got none")
+	}
+
+	// Test 2: Query with just "remote_name" format (traditional)
+	groups2, err := repo.FindDuplicatesWithinRemote(ctx, remName, "", 0, 0)
+	if err != nil {
+		t.Fatalf("FindDuplicatesWithinRemote with name only failed: %v", err)
+	}
+	if len(groups2) == 0 {
+		t.Errorf("expected duplicates with name-only format, got none")
+	}
+
+	// Both queries should return the same results
+	if len(groups1) != len(groups2) {
+		t.Errorf("different results for same remote: hostname/name got %d, name-only got %d", len(groups1), len(groups2))
+	}
+
+	// Cleanup
+	repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE remote_id = $1`, remID)
+	repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id = $1`, hash)
+	repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2)`, meta1, meta2)
+	repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
+	repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, remID)
+}
+
+// TestFindDuplicatesWithinRemote_HostnameInNameWithSlash tests edge case:
+// If a remote name contains "/" it should be parsed correctly.
+func TestFindDuplicatesWithinRemote_HostnamePrefixedPath(t *testing.T) {
+	pool := openTestDB(t)
+	repo := NewObjectRepository(database.NewPgxDatabase(pool))
+	ctx := context.Background()
+
+	// Create a remote representing a local scan path with hostname
+	host := "archlinux"
+	remName := "/tmp/fs-test.xyz/light" // Local scan path
+	rem := remote.NewRemote(host, remName)
+	remID, err := repo.WriteRemote(ctx, rem)
+	if err != nil {
+		t.Fatalf("WriteRemote failed: %v", err)
+	}
+
+	// Create duplicates
+	hash := writeRaw(t, ctx, repo, "path_hash", "sha256")
+	meta1 := writeMetaRaw(t, ctx, repo, "doc.txt", "/doc.txt", "text/plain")
+	meta2 := writeMetaRaw(t, ctx, repo, "doc.txt", "/backup/doc.txt", "text/plain")
+	writeJunctionRaw(t, ctx, repo, meta1, hash)
+	writeJunctionRaw(t, ctx, repo, meta2, hash)
+
+	if _, err := repo.db.Exec(ctx, `INSERT INTO object_remote_junction (object_meta_id, remote_id) VALUES ($1, $2), ($3, $2)`, meta1, remID, meta2); err != nil {
+		t.Fatalf("failed to link metadata: %v", err)
+	}
+
+	// Query with full "hostname/remote_name" format (as it appears in report)
+	groups, err := repo.FindDuplicatesWithinRemote(ctx, host+"/"+remName, "", 0, 0)
+	if err != nil {
+		t.Fatalf("FindDuplicatesWithinRemote failed: %v", err)
+	}
+	if len(groups) != 1 {
+		t.Errorf("expected 1 duplicate group, got %d", len(groups))
+	}
+
+	// Cleanup
+	repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE remote_id = $1`, remID)
+	repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id = $1`, hash)
+	repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2)`, meta1, meta2)
+	repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
+	repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, remID)
+}

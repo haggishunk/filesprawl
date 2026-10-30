@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/haggishunk/filesprawl/internal/database"
 	"github.com/haggishunk/filesprawl/internal/object"
@@ -539,8 +540,28 @@ func (r *ObjectRepository) FindDuplicatesAcrossRemotes(ctx context.Context, hash
 
 // FindDuplicatesWithinRemote returns hashes shared by more than one file within
 // a specific remote. Optionally filter by hashType (empty = all types).
+// Accepts remoteName in either "remote_name" or "hostname/remote_name" format.
 func (r *ObjectRepository) FindDuplicatesWithinRemote(ctx context.Context, remoteName, hashType string, limit, offset int) ([]HashGroup, error) {
-	args := []interface{}{remoteName}
+	// Parse remote name which can be in format:
+	// - "remote_name" (for rclone remotes)
+	// - "hostname/remote_name" (for local scans with hostname prefix, shown in report output)
+	var queryClause string
+	var args []interface{}
+
+	if strings.Contains(remoteName, "/") {
+		// Format: "hostname/remote_name" - match both hostname and remote_name
+		parts := strings.SplitN(remoteName, "/", 2)
+		hostname := parts[0]
+		name := parts[1]
+		queryClause = "WHERE r.hostname = $1 AND r.remote_name = $2"
+		args = []interface{}{hostname, name}
+	} else {
+		// Format: "remote_name" - match just the remote name
+		// Note: This also matches local scans without hostname prefix (backward compatibility)
+		queryClause = "WHERE r.remote_name = $1"
+		args = []interface{}{remoteName}
+	}
+
 	hashFilter := ""
 	if hashType != "" {
 		args = append(args, hashType)
@@ -561,13 +582,13 @@ func (r *ObjectRepository) FindDuplicatesWithinRemote(ctx context.Context, remot
 		JOIN object_meta om ON ohj.object_meta_id = om.id
 		JOIN object_remote_junction orj ON om.id = orj.object_meta_id
 		JOIN remote r ON orj.remote_id = r.id
-		WHERE r.remote_name = $1
+		%s
 		%s
 		GROUP BY oh.hash_value, oh.hash_type
 		HAVING COUNT(DISTINCT om.id) > 1
 		ORDER BY duplicate_count DESC
 		%s;
-	`, hashFilter, limitClause)
+	`, queryClause, hashFilter, limitClause)
 
 	rows, err := r.db.Query(ctx, statement, args...)
 	if err != nil {
