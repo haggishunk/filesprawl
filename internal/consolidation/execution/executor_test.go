@@ -1,13 +1,11 @@
 package execution
 
 import (
-	"context"
 	"testing"
-	"github.com/haggishunk/filesprawl/internal/consolidation/flags"
 )
 
 func TestNewExecutor(t *testing.T) {
-	executor := NewExecutor(nil, 1)
+	executor := NewExecutor(nil, nil, 1)
 
 	if executor.userID != 1 {
 		t.Errorf("expected userID 1, got %d", executor.userID)
@@ -19,7 +17,7 @@ func TestNewExecutor(t *testing.T) {
 }
 
 func TestSetDryRun(t *testing.T) {
-	executor := NewExecutor(nil, 1)
+	executor := NewExecutor(nil, nil, 1)
 
 	executor.SetDryRun(true)
 	if !executor.dryRun {
@@ -68,7 +66,7 @@ func TestExecutionResultCreation(t *testing.T) {
 }
 
 func TestGetExecutionSummary(t *testing.T) {
-	executor := NewExecutor(nil, 1)
+	executor := NewExecutor(nil, nil, 1)
 
 	result := &ExecutionResult{
 		KeepCount:    10,
@@ -100,7 +98,7 @@ func TestGetExecutionSummary(t *testing.T) {
 }
 
 func TestGetExecutionSummaryWithErrors(t *testing.T) {
-	executor := NewExecutor(nil, 1)
+	executor := NewExecutor(nil, nil, 1)
 
 	result := &ExecutionResult{
 		KeepCount:    10,

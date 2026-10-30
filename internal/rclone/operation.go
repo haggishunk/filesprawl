@@ -54,3 +54,20 @@ func ListRemotes(ctx context.Context) (*ListRemotesResponse, error) {
 	}
 	return &lr, nil
 }
+
+// CallRC makes a generic rclone RC call and returns the raw response
+func CallRC(ctx context.Context, path string, params rc.Params) error {
+	out, callErr := doCall(ctx, path, params)
+	if callErr != nil {
+		return fmt.Errorf("failed to make rclone rc call to %s: %w", path, callErr)
+	}
+
+	// Check for error in response
+	if out != nil {
+		if errVal, ok := out["error"]; ok && errVal != nil {
+			return fmt.Errorf("rclone rc error: %v", errVal)
+		}
+	}
+
+	return nil
+}

@@ -38,6 +38,7 @@ rcd session running on http://localhost:5572.`,
 
 func init() {
 	rootCmd.AddCommand(listRemotesCmd)
+	rootCmd.AddCommand(consolidateCmd)
 }
 
 // Execute runs the root command using the supplied context. It is the single

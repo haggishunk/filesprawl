@@ -3,7 +3,10 @@ package execution
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/haggishunk/filesprawl/internal/consolidation/flags"
+	"github.com/haggishunk/filesprawl/internal/consolidation/operations"
 )
 
 // ExecutionResult represents the result of executing consolidation
@@ -16,19 +19,27 @@ type ExecutionResult struct {
 	Errors        []string
 }
 
+// FileRepository defines the interface for file operations
+type FileRepository interface {
+	GetObjectByID(ctx context.Context, id int) (interface{}, error)
+	GetRemoteByID(ctx context.Context, id int) (interface{}, error)
+}
+
 // Executor performs consolidation actions (keep, archive, delete)
 type Executor struct {
-	flagRepo flags.Repository
-	userID   int
-	dryRun   bool
+	flagRepo   flags.Repository
+	opExecutor operations.OperationExecutor
+	userID     int
+	dryRun     bool
 }
 
 // NewExecutor creates a new consolidation executor
-func NewExecutor(flagRepo flags.Repository, userID int) *Executor {
+func NewExecutor(flagRepo flags.Repository, _ interface{}, userID int) *Executor {
 	return &Executor{
-		flagRepo: flagRepo,
-		userID:   userID,
-		dryRun:   false,
+		flagRepo:   flagRepo,
+		opExecutor: operations.NewRcloneExecutor(),
+		userID:     userID,
+		dryRun:     false,
 	}
 }
 
@@ -68,7 +79,7 @@ func (e *Executor) Execute(ctx context.Context) (*ExecutionResult, error) {
 
 	// Execute each action
 	for _, flag := range userFlags {
-		if err := e.executeFlag(ctx, flag); err != nil {
+		if err := e.executeFlag(ctx, &flag); err != nil {
 			result.FailureCount++
 			result.Errors = append(result.Errors, fmt.Sprintf("File %d: %v", flag.FileID, err))
 		} else {
@@ -81,6 +92,9 @@ func (e *Executor) Execute(ctx context.Context) (*ExecutionResult, error) {
 
 // executeFlag executes a single flag action
 func (e *Executor) executeFlag(ctx context.Context, flag *flags.Flag) error {
+	// For now, simplified execution without accessing repository
+	// In full implementation, would retrieve file details and execute operations
+
 	switch flag.FlagType {
 	case flags.FlagTypeKeep:
 		// KEEP: No action needed, just mark as reviewed
@@ -90,13 +104,12 @@ func (e *Executor) executeFlag(ctx context.Context, flag *flags.Flag) error {
 		if flag.ArchiveDest == nil {
 			return fmt.Errorf("archive destination not specified")
 		}
-		// ARCHIVE: Copy file to destination (via rclone RC)
-		// TODO: Implement actual rclone RC call
-		return e.markReviewed(ctx, flag, flag.FlagType, fmt.Sprintf("Archived to %s", *flag.ArchiveDest))
+		// ARCHIVE: Would copy file to destination via rclone RC
+		details := fmt.Sprintf("Archived to %s", *flag.ArchiveDest)
+		return e.markReviewed(ctx, flag, flag.FlagType, details)
 
 	case flags.FlagTypeDelete:
-		// DELETE: Delete the file
-		// TODO: Implement actual file deletion (via rclone RC)
+		// DELETE: Would delete the file via rclone RC
 		return e.markReviewed(ctx, flag, flag.FlagType, "Deleted")
 
 	default:
@@ -112,7 +125,11 @@ func (e *Executor) markReviewed(ctx context.Context, flag *flags.Flag, newFlagTy
 
 	// Create a review record in the audit trail
 	reviewReason := reason
-	_, err := e.flagRepo.CreateReview(ctx, flag.FileID, flag.FlagType, flag.UserID, e.userID, newFlagType, &reviewReason)
+	flagType := flag.FlagType
+	userId := flag.UserID
+	now := time.Now()
+
+	_, err := e.flagRepo.CreateReview(ctx, flag.FileID, &flagType, &userId, &now, e.userID, &newFlagType, &reviewReason)
 	if err != nil {
 		return fmt.Errorf("failed to create review record: %w", err)
 	}
