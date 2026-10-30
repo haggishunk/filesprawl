@@ -101,3 +101,97 @@ DELETE (3 files):
 ```
 - **AND** user can review each action with full file details
 - **AND** system performs final safety check before execution
+
+### Requirement: User Authentication and Session Management
+The system SHALL require users to authenticate or create accounts before consolidation sessions, enabling multi-user tracking and collaborative review workflows.
+
+#### Scenario: New user starts consolidation session
+- **WHEN** user runs `filesprawl consolidate --remote media` for first time
+- **THEN** system prompts for username: "Enter your name (or create new): [____]"
+- **AND** system shows registered users with keyboard navigation: "← previous user | user-name | next user →"
+- **AND** user can select existing user with arrow keys or type new name
+- **AND** new users are created automatically with timestamp
+- **AND** selected user authenticated for consolidation session
+
+#### Scenario: Returning user selects from history
+- **WHEN** consolidation starts and users have been registered
+- **THEN** system displays recent users: "Last used: alice (2 days ago), bob (1 week ago)"
+- **AND** user selects from list with arrow keys [↑↓] and confirms [Enter]
+- **AND** or type new name to create different user account
+
+### Requirement: Persistent Consolidation Flagging in Database
+The system SHALL persist all consolidation flag decisions (keep/archive/delete) in the database with user and timestamp information, enabling pause/resume and multi-user review workflows.
+
+#### Scenario: User flags files and exits without archiving
+- **WHEN** user flags files (keep/archive/delete) during browsing
+- **THEN** system stores each flag in database with:
+  - File ID (object_meta.id)
+  - Flag type (KEEP | ARCHIVE | DELETE)
+  - User who flagged (username)
+  - Timestamp when flagged
+  - Flag reason (optional note: "corrupted", "best version", etc.)
+- **AND** user can exit consolidation at any point: "[Q]uit and save flags"
+- **AND** flags are safely persisted even if consolidation not executed
+- **AND** user sees confirmation: "✓ Saved 47 flags for review later"
+
+#### Scenario: User reviews previously flagged files
+- **WHEN** user starts new consolidation session with same duplicate group
+- **THEN** system shows previously flagged decisions:
+```
+Previous Flags (by alice, 2 days ago):
+  ✓ KEEP: photo.jpg @ s3-backup
+  ▶ ARCHIVE: old-photo.jpg @ archlinux
+  ✗ DELETE: corrupted.jpg
+```
+- **AND** user can accept previous flags with one keystroke
+- **AND** or modify individual flags
+- **AND** all changes tracked to new user/timestamp
+
+### Requirement: Multi-User Review and Collaboration
+The system SHALL allow multiple users to review flagged decisions, confirming or modifying flags, and ensuring consensus before consolidation execution.
+
+#### Scenario: Second user reviews flags from first user
+- **WHEN** user logs in as different person: "alice flagged 47 files 2 days ago"
+- **THEN** system displays: "Review pending flags by alice?"
+- **AND** shows flag summary grouped by action:
+```
+Alice's Flagged Decisions (47 files):
+  ✓ KEEP: 5 files (+ details)
+  ▶ ARCHIVE: 23 files (+ destination)
+  ✗ DELETE: 3 files (+ safety notes)
+
+Review: [A]ccept All [M]odify Individual [R]eject All [C]ancel
+```
+- **AND** second user can [A]ccept alice's decisions unchanged
+- **AND** or [M]odify specific flags with approval notation
+- **AND** all changes logged with new user name and timestamp
+
+#### Scenario: Modified flags show review trail
+- **WHEN** second user modifies first user's flags
+- **THEN** system tracks modification history:
+```
+Flag: DELETE photo.jpg
+  Original: alice (FLAGGED as DELETE, 2 days ago)
+  Modified: bob (CHANGED to KEEP, now)
+  Reason: "Actually a good copy, bob verified quality"
+```
+- **AND** users can view complete review trail for each file
+- **AND** final execution requires approval from last reviewer
+
+#### Scenario: Consensus confirmation before execution
+- **WHEN** multiple users have reviewed and modified flags
+- **THEN** system shows final consolidated view with review trail:
+```
+📋 FINAL CONSOLIDATION SUMMARY (Multi-User Approved)
+
+KEEP (5 files):
+  ✓ photo.jpg — Flagged by alice, approved by bob
+
+ARCHIVE (23 files):
+  ▶ old-photo.jpg → archive-s3, Flagged by alice, bob verified
+
+DELETE (3 files):
+  ✗ corrupted.jpg — Flagged by alice, confirmed by bob
+```
+- **AND** execution requires confirmation from last reviewer
+- **AND** system logs all reviewers and timestamps before execution

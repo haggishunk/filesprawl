@@ -35,6 +35,9 @@ Users have large numbers of duplicates across multiple remotes (e.g., 57k+ group
    - **Filename View**: Group by name, show all different versions (hashes)
    - **Decision Flagging**: Individual file marking for keep/archive/delete with persistent state
 9. **Location Presence Indicators**: Color-coded status (🟢 green/🟡 yellow/🔴 red) showing backup replication health and single-point-of-failure warnings
+10. **Persistent Flagging**: All consolidation decisions stored in database with user/timestamp, enabling pause-resume and multi-user review
+11. **User Authentication**: Simple username-based authentication (register on first use) to track who flags files and enable collaborative workflows
+12. **Multi-User Review**: Second user can review and confirm/modify first user's flags with full audit trail before execution
 
 ## Risks
 - **Large batches**: 118k+ groups could overwhelm terminal. Mitigation: paginate, batch mode, progress bars
@@ -161,4 +164,81 @@ type ConsolidationSession {
   ExpandedItems Set[FileID | HashID]
   PageCursor Position
 }
+```
+
+## Multi-User Persistence Architecture
+
+### User Management
+- Simple username-based authentication (no passwords)
+- Users created on-demand at session start
+- Stored in database: `consolidation_users` table
+  - `id`, `username`, `created_at`, `last_active`
+
+### Consolidation Flagging Persistence
+Database table: `consolidation_flags`
+```
+id              INTEGER PRIMARY KEY
+file_id         INTEGER REFERENCES object_meta(id)
+user_id         INTEGER REFERENCES consolidation_users(id)
+flag_type       ENUM (KEEP | ARCHIVE | DELETE)
+flagged_at      TIMESTAMP
+reason          TEXT (optional: "corrupted", "best version", etc.)
+archive_dest    TEXT (if flag_type = ARCHIVE)
+```
+
+### Review Trail Architecture
+Database table: `consolidation_reviews`
+```
+id              INTEGER PRIMARY KEY
+file_id         INTEGER REFERENCES object_meta(id)
+original_flag   ENUM (KEEP | ARCHIVE | DELETE)
+original_user   INTEGER REFERENCES consolidation_users(id)
+original_at     TIMESTAMP
+reviewed_by     INTEGER REFERENCES consolidation_users(id)
+reviewed_at     TIMESTAMP
+new_flag        ENUM (KEEP | ARCHIVE | DELETE)
+review_reason   TEXT
+```
+
+### Session Workflow State Machine
+```
+START
+  ↓
+[User Auth] — Select/create user
+  ↓
+[Show Pending Flags] — Load flags from DB
+  ├─ No flags yet: Start fresh
+  └─ Existing flags: Review and accept/modify
+  ↓
+[Browse & Flag] — User flags files
+  │ (All flags written to DB immediately)
+  │
+  ├─ [Q]uit → Save & Exit (flags persisted)
+  └─ [S]ummary → Review & Execute
+  ↓
+[Final Confirmation] — Execute consolidation
+  ├─ Single user: Execute immediately
+  └─ Multi-review: Log all reviewers, execute
+```
+
+### Multi-User Review Workflow
+```
+Day 1: alice flags 47 files (persisted)
+  ↓
+Day 2: bob logs in, sees alice's flags
+  ├─ [A]ccept all → Flags accepted by bob (logged)
+  ├─ [M]odify → Select file, change flag (logged as review)
+  └─ [R]eject all → Flags removed
+  ↓
+Charlie logs in, sees alice's + bob's review trail
+  ├─ Decides to execute → Consolidation runs
+  └─ All users logged in final audit trail
+```
+
+### Data Guarantees
+- ✅ All flags persisted immediately (no data loss)
+- ✅ Complete audit trail (who flagged what, when)
+- ✅ Review trail (modifications tracked)
+- ✅ Multi-user consensus before execution
+- ✅ No execution without final review confirmation
 ```
