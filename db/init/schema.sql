@@ -8,11 +8,18 @@ CREATE TABLE IF NOT EXISTS object_hash (
 
 CREATE INDEX IF NOT EXISTS idx_object_hash_value ON object_hash (hash_value);
 
+CREATE TABLE IF NOT EXISTS location (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('local', 'remote')),
+  UNIQUE(name, type)
+);
+
 CREATE TABLE IF NOT EXISTS remote (
   id SERIAL PRIMARY KEY,
+  location_id INT NOT NULL REFERENCES location(id) ON DELETE RESTRICT,
   remote_name TEXT NOT NULL,
-  remote_type TEXT NOT NULL,
-  hostname TEXT NOT NULL
+  scan_root TEXT
 );
 
 CREATE TABLE IF NOT EXISTS object_meta (
