@@ -1,126 +1,192 @@
 package widgets
 
-// BaseListWidget wraps a list widget for common functionality
-// NOTE: Phase 5 TUI integration pending. Stub implementation for now.
+import (
+	"github.com/metaspartan/gotui/v5/widgets"
+)
+
+// BaseListWidget wraps a gotui List widget for common functionality
 type BaseListWidget struct {
-	selectedIndex int
-	title         string
-	rows          []string
+	list       *widgets.List
+	title      string
+	rows       []string
 	x, y, width, height int // Rectangle dimensions
 }
 
 // NewBaseListWidget creates a new base list widget
 func NewBaseListWidget(title string) *BaseListWidget {
+	list := widgets.NewList()
+	if list != nil {
+		list.Title = title
+	}
+
 	return &BaseListWidget{
-		title:         title,
-		selectedIndex: 0,
-		rows:          []string{},
-		x:             0,
-		y:             0,
-		width:         0,
-		height:        0,
+		list:   list,
+		title:  title,
+		rows:   []string{},
+		x:      0,
+		y:      0,
+		width:  0,
+		height: 0,
 	}
 }
 
-// GetWidget returns the underlying widget
+// GetWidget returns the underlying gotui List widget
 func (w *BaseListWidget) GetWidget() interface{} {
-	// Return a non-nil placeholder for testing
-	// In Phase 5, this would return the actual gotui List widget
-	return w
+	if w == nil || w.list == nil {
+		return nil
+	}
+	return w.list
 }
 
-// SetRows updates the list rows
+// SetRows updates the list rows and syncs with gotui.List
 func (w *BaseListWidget) SetRows(rows []string) error {
+	if w == nil {
+		return nil
+	}
 	w.rows = rows
+	if w.list != nil {
+		w.list.Rows = rows
+	}
 	return nil
 }
 
 // GetRows returns the current rows
 func (w *BaseListWidget) GetRows() []string {
+	if w == nil {
+		return []string{}
+	}
 	return w.rows
 }
 
 // GetSelectedIndex returns the currently selected item index
 func (w *BaseListWidget) GetSelectedIndex() int {
-	return w.selectedIndex
+	if w == nil || w.list == nil {
+		return 0
+	}
+	return w.list.SelectedRow
 }
 
 // SetSelectedIndex sets the selected item index
 func (w *BaseListWidget) SetSelectedIndex(index int) error {
+	if w == nil || w.list == nil {
+		return nil
+	}
 	if index < 0 || index >= len(w.rows) {
 		return nil // Silently ignore invalid indices
 	}
-	w.selectedIndex = index
+	w.list.SelectedRow = index
 	return nil
 }
 
 // GetTitle returns the widget title
 func (w *BaseListWidget) GetTitle() string {
+	if w == nil {
+		return ""
+	}
 	return w.title
 }
 
 // SetTitle sets the widget title
 func (w *BaseListWidget) SetTitle(title string) {
+	if w == nil {
+		return
+	}
 	w.title = title
+	if w.list != nil {
+		w.list.Title = title
+	}
 }
 
 // SetRect sets the drawing rectangle
 func (w *BaseListWidget) SetRect(x, y, width, height int) {
+	if w == nil {
+		return
+	}
 	w.x = x
 	w.y = y
 	w.width = width
 	w.height = height
+	if w.list != nil {
+		w.list.SetRect(x, y, width, height)
+	}
 }
 
 // GetRect returns the current drawing rectangle
 func (w *BaseListWidget) GetRect() (int, int, int, int) {
+	if w == nil {
+		return 0, 0, 0, 0
+	}
 	return w.x, w.y, w.width, w.height
 }
 
 // ScrollUp scrolls up in the list
 func (w *BaseListWidget) ScrollUp() {
-	if w.selectedIndex > 0 {
-		w.selectedIndex--
+	if w == nil || w.list == nil {
+		return
+	}
+	if w.list.SelectedRow > 0 {
+		w.list.SelectedRow--
 	}
 }
 
 // ScrollDown scrolls down in the list
 func (w *BaseListWidget) ScrollDown() {
-	if w.selectedIndex < len(w.rows)-1 {
-		w.selectedIndex++
+	if w == nil || w.list == nil {
+		return
+	}
+	if w.list.SelectedRow < len(w.rows)-1 {
+		w.list.SelectedRow++
 	}
 }
 
 // GetSelectedRow returns the selected row text
 func (w *BaseListWidget) GetSelectedRow() string {
-	if w.selectedIndex >= 0 && w.selectedIndex < len(w.rows) {
-		return w.rows[w.selectedIndex]
+	if w == nil || w.list == nil {
+		return ""
+	}
+	idx := w.list.SelectedRow
+	if idx >= 0 && idx < len(w.rows) {
+		return w.rows[idx]
 	}
 	return ""
 }
 
 // IsEmpty checks if the list is empty
 func (w *BaseListWidget) IsEmpty() bool {
+	if w == nil {
+		return true
+	}
 	return len(w.rows) == 0
 }
 
 // Clear clears all rows
 func (w *BaseListWidget) Clear() {
+	if w == nil {
+		return
+	}
 	w.rows = []string{}
-	w.selectedIndex = 0
+	if w.list != nil {
+		w.list.Rows = []string{}
+		w.list.SelectedRow = 0
+	}
 }
 
 // Count returns the number of rows
 func (w *BaseListWidget) Count() int {
+	if w == nil {
+		return 0
+	}
 	return len(w.rows)
 }
 
-// SetBorderStyle sets border styling (stub)
+// SetBorderStyle sets border styling
 func (w *BaseListWidget) SetBorderStyle(_ interface{}) {
-	// TODO: Implement full gotui style support
+	// gotui List handles border styling through its internal state
+	// This is a placeholder for future enhancements
 }
 
-// SetTitleStyle sets title styling (stub)
+// SetTitleStyle sets title styling
 func (w *BaseListWidget) SetTitleStyle(_ interface{}) {
-	// TODO: Implement full gotui style support
+	// gotui List handles title styling through its internal state
+	// This is a placeholder for future enhancements
 }
