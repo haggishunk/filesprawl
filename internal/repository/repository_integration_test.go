@@ -516,10 +516,10 @@ func TestFindDuplicatesWithinRemote_WithHostnamePrefix(t *testing.T) {
 	host := "testhost"
 	remName := "testremote"
 	rem := remote.NewRemote(host, remName)
-	remID, err := repo.WriteRemote(ctx, rem)
-	if err != nil {
+	if err := repo.WriteRemote(ctx, &rem); err != nil {
 		t.Fatalf("WriteRemote failed: %v", err)
 	}
+	remID := rem.Id
 
 	// Create duplicate files and associate with remote
 	hash := writeRaw(t, ctx, repo, "dup_hash_with_host", "md5")
@@ -575,10 +575,10 @@ func TestFindDuplicatesWithinRemote_HostnamePrefixedPath(t *testing.T) {
 	host := "archlinux"
 	remName := "/tmp/fs-test.xyz/light" // Local scan path
 	rem := remote.NewRemote(host, remName)
-	remID, err := repo.WriteRemote(ctx, rem)
-	if err != nil {
+	if err := repo.WriteRemote(ctx, &rem); err != nil {
 		t.Fatalf("WriteRemote failed: %v", err)
 	}
+	remID := rem.Id
 
 	// Create duplicates
 	hash := writeRaw(t, ctx, repo, "path_hash", "sha256")
