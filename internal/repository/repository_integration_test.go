@@ -372,3 +372,135 @@ func TestIntegration_PersistLocalResult_SymlinkMarked(t *testing.T) {
 		t.Fatalf("expected no hash junctions for symlink, got %d", hashLinks)
 	}
 }
+
+// TestGetFilesByHashes tests the batch query method for multiple hashes.
+// This integration test verifies that GetFilesByHashes returns all files for
+// multiple hashes in a single query, addressing the N+1 performance issue.
+func TestGetFilesByHashes(t *testing.T) {
+	pool := openTestDB(t)
+	repo := NewObjectRepository(database.NewPgxDatabase(pool))
+	ctx := context.Background()
+
+	// Create 3 hashes with 2 files each = 6 total files
+	hash1 := writeRaw(t, ctx, repo, "batch_hash_1", "md5")
+	hash2 := writeRaw(t, ctx, repo, "batch_hash_2", "sha256")
+	hash3 := writeRaw(t, ctx, repo, "batch_hash_3", "sha1")
+
+	meta1a := writeMetaRaw(t, ctx, repo, "file1a.txt", "/path/file1a.txt", "text/plain")
+	meta1b := writeMetaRaw(t, ctx, repo, "file1b.txt", "/path/file1b.txt", "text/plain")
+	meta2a := writeMetaRaw(t, ctx, repo, "file2a.txt", "/path/file2a.txt", "text/plain")
+	meta2b := writeMetaRaw(t, ctx, repo, "file2b.txt", "/path/file2b.txt", "text/plain")
+	meta3a := writeMetaRaw(t, ctx, repo, "file3a.txt", "/path/file3a.txt", "text/plain")
+	meta3b := writeMetaRaw(t, ctx, repo, "file3b.txt", "/path/file3b.txt", "text/plain")
+
+	writeJunctionRaw(t, ctx, repo, meta1a, hash1)
+	writeJunctionRaw(t, ctx, repo, meta1b, hash1)
+	writeJunctionRaw(t, ctx, repo, meta2a, hash2)
+	writeJunctionRaw(t, ctx, repo, meta2b, hash2)
+	writeJunctionRaw(t, ctx, repo, meta3a, hash3)
+	writeJunctionRaw(t, ctx, repo, meta3b, hash3)
+
+	// Batch query for all 3 hashes
+	hashes := []HashTypePair{
+		{HashValue: "batch_hash_1", HashType: "md5"},
+		{HashValue: "batch_hash_2", HashType: "sha256"},
+		{HashValue: "batch_hash_3", HashType: "sha1"},
+	}
+
+	result, err := repo.GetFilesByHashes(ctx, hashes, 0)
+	if err != nil {
+		t.Fatalf("GetFilesByHashes failed: %v", err)
+	}
+
+	// Verify we got results for all 3 hashes
+	if len(result) != 3 {
+		t.Fatalf("expected 3 hash keys, got %d", len(result))
+	}
+
+	// Verify each hash has 2 files
+	for _, key := range []string{"batch_hash_1:md5", "batch_hash_2:sha256", "batch_hash_3:sha1"} {
+		if len(result[key]) != 2 {
+			t.Errorf("hash %q: expected 2 files, got %d", key, len(result[key]))
+		}
+	}
+
+	// Verify file names are correct
+	files1 := result["batch_hash_1:md5"]
+	if len(files1) == 2 {
+		names := make(map[string]bool)
+		for _, f := range files1 {
+			names[f.Name] = true
+		}
+		if !names["file1a.txt"] || !names["file1b.txt"] {
+			t.Errorf("hash1 files: expected file1a.txt and file1b.txt, got %v", names)
+		}
+	}
+
+	// Cleanup
+	repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id IN ($1, $2, $3)`, hash1, hash2, hash3)
+	repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2, $3, $4, $5, $6)`,
+		meta1a, meta1b, meta2a, meta2b, meta3a, meta3b)
+	repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id IN ($1, $2, $3)`, hash1, hash2, hash3)
+}
+
+// TestGetFilesByHashes_WithMinSize tests batch query respects size filter.
+func TestGetFilesByHashes_WithMinSize(t *testing.T) {
+	pool := openTestDB(t)
+	repo := NewObjectRepository(database.NewPgxDatabase(pool))
+	ctx := context.Background()
+
+	hash := writeRaw(t, ctx, repo, "size_test_hash", "md5")
+	// File with size 5000 (passes minSize=1000)
+	meta1 := writeMetaWithSize(t, ctx, repo, "large.bin", "/path/large.bin", "application/octet-stream", 5000)
+	// File with size 500 (fails minSize=1000)
+	meta2 := writeMetaWithSize(t, ctx, repo, "small.bin", "/path/small.bin", "application/octet-stream", 500)
+
+	writeJunctionRaw(t, ctx, repo, meta1, hash)
+	writeJunctionRaw(t, ctx, repo, meta2, hash)
+
+	// Query with minSize=1000 should only return large.bin
+	hashes := []HashTypePair{{HashValue: "size_test_hash", HashType: "md5"}}
+	result, err := repo.GetFilesByHashes(ctx, hashes, 1000)
+	if err != nil {
+		t.Fatalf("GetFilesByHashes failed: %v", err)
+	}
+
+	files := result["size_test_hash:md5"]
+	if len(files) != 1 {
+		t.Errorf("expected 1 file after size filter, got %d", len(files))
+	}
+	if files[0].Name != "large.bin" {
+		t.Errorf("expected large.bin, got %s", files[0].Name)
+	}
+
+	// Cleanup
+	repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id = $1`, hash)
+	repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2)`, meta1, meta2)
+	repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
+}
+
+// TestGetFilesByHashes_Empty tests batch query with empty hash list.
+func TestGetFilesByHashes_Empty(t *testing.T) {
+	pool := openTestDB(t)
+	repo := NewObjectRepository(database.NewPgxDatabase(pool))
+	ctx := context.Background()
+
+	result, err := repo.GetFilesByHashes(ctx, []HashTypePair{}, 0)
+	if err != nil {
+		t.Fatalf("GetFilesByHashes failed: %v", err)
+	}
+	if len(result) != 0 {
+		t.Errorf("expected 0 results for empty hash list, got %d", len(result))
+	}
+}
+
+// Helper to write metadata with specific size
+func writeMetaWithSize(t *testing.T, ctx context.Context, repo *ObjectRepository, name, path, mime string, size int64) int {
+	t.Helper()
+	m := object.NewMeta(name, path, mime)
+	m.Size = size
+	if err := repo.WriteMeta(ctx, &m); err != nil {
+		t.Fatalf("WriteMeta failed: %v", err)
+	}
+	return m.Id
+}

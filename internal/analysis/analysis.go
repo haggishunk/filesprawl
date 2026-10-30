@@ -46,6 +46,7 @@ type duplicateRepo interface {
 	FindDuplicatesAcrossRemotes(ctx context.Context, hashType string, limit, offset int) ([]repository.HashGroup, error)
 	FindDuplicatesWithinRemote(ctx context.Context, remoteName, hashType string, limit, offset int) ([]repository.HashGroup, error)
 	GetFilesByHash(ctx context.Context, hashValue, hashType string, minSize int64) ([]repository.FileRecord, error)
+	GetFilesByHashes(ctx context.Context, hashes []repository.HashTypePair, minSize int64) (repository.FilesByHashMap, error)
 }
 
 // DuplicateDetector finds and groups duplicate files using the repository.
@@ -79,18 +80,38 @@ func (d *DuplicateDetector) FindWithinRemote(ctx context.Context, remoteName str
 	return d.enrich(ctx, groups, opts.MinSize)
 }
 
-// enrich fetches file details for each HashGroup and assembles DuplicateGroups.
+// enrich fetches file details for all HashGroups in a single batch query and assembles DuplicateGroups.
 func (d *DuplicateDetector) enrich(ctx context.Context, groups []repository.HashGroup, minSize int64) ([]DuplicateGroup, error) {
+	if len(groups) == 0 {
+		return []DuplicateGroup{}, nil
+	}
+
+	// Convert groups to HashTypePair for batch query
+	hashes := make([]repository.HashTypePair, len(groups))
+	for i, g := range groups {
+		hashes[i] = repository.HashTypePair{
+			HashValue: g.HashValue,
+			HashType:  g.HashType,
+		}
+	}
+
+	// Fetch all files for all hashes in a single query
+	filesByHash, err := d.repo.GetFilesByHashes(ctx, hashes, minSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get files for hashes: %w", err)
+	}
+
+	// Build result from batch query data
 	result := make([]DuplicateGroup, 0, len(groups))
 	for _, g := range groups {
-		records, err := d.repo.GetFilesByHash(ctx, g.HashValue, g.HashType, minSize)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get files for hash %s/%s: %w", g.HashValue, g.HashType, err)
-		}
+		key := g.HashValue + ":" + g.HashType
+		records := filesByHash[key]
+
 		// After applying minSize filter, skip groups that no longer have duplicates.
 		if len(records) < 2 {
 			continue
 		}
+
 		files := make([]FileInfo, len(records))
 		for i, rec := range records {
 			files[i] = FileInfo{
