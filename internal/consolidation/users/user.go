@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/haggishunk/filesprawl/internal/database"
 )
 
 // User represents a consolidation user
@@ -39,11 +41,11 @@ type Repository interface {
 
 // PostgresRepository implements Repository using PostgreSQL
 type PostgresRepository struct {
-	db *sql.DB
+	db database.Database
 }
 
 // NewPostgresRepository creates a new PostgreSQL-backed user repository
-func NewPostgresRepository(db *sql.DB) *PostgresRepository {
+func NewPostgresRepository(db database.Database) *PostgresRepository {
 	return &PostgresRepository{db: db}
 }
 
@@ -59,7 +61,7 @@ func (r *PostgresRepository) CreateUser(ctx context.Context, username string) (*
 		LastActive: time.Now(),
 	}
 
-	err := r.db.QueryRowContext(
+	err := r.db.QueryRow(
 		ctx,
 		`INSERT INTO consolidation_users (username, created_at, last_active)
 		 VALUES ($1, $2, $3)
@@ -77,7 +79,7 @@ func (r *PostgresRepository) CreateUser(ctx context.Context, username string) (*
 // GetUser retrieves a user by ID
 func (r *PostgresRepository) GetUser(ctx context.Context, id int) (*User, error) {
 	user := &User{}
-	err := r.db.QueryRowContext(
+	err := r.db.QueryRow(
 		ctx,
 		`SELECT id, username, created_at, last_active
 		 FROM consolidation_users WHERE id = $1`,
@@ -97,7 +99,7 @@ func (r *PostgresRepository) GetUser(ctx context.Context, id int) (*User, error)
 // GetUserByUsername retrieves a user by username
 func (r *PostgresRepository) GetUserByUsername(ctx context.Context, username string) (*User, error) {
 	user := &User{}
-	err := r.db.QueryRowContext(
+	err := r.db.QueryRow(
 		ctx,
 		`SELECT id, username, created_at, last_active
 		 FROM consolidation_users WHERE username = $1`,
@@ -116,7 +118,7 @@ func (r *PostgresRepository) GetUserByUsername(ctx context.Context, username str
 
 // ListUsers returns all users
 func (r *PostgresRepository) ListUsers(ctx context.Context) ([]User, error) {
-	rows, err := r.db.QueryContext(
+	rows, err := r.db.Query(
 		ctx,
 		`SELECT id, username, created_at, last_active
 		 FROM consolidation_users
@@ -142,7 +144,7 @@ func (r *PostgresRepository) ListUsers(ctx context.Context) ([]User, error) {
 // UpdateLastActive updates the last_active timestamp
 func (r *PostgresRepository) UpdateLastActive(ctx context.Context, userID int) error {
 	now := time.Now()
-	result, err := r.db.ExecContext(
+	result, err := r.db.Exec(
 		ctx,
 		`UPDATE consolidation_users SET last_active = $1 WHERE id = $2`,
 		now, userID,
@@ -151,12 +153,7 @@ func (r *PostgresRepository) UpdateLastActive(ctx context.Context, userID int) e
 		return fmt.Errorf("failed to update last_active: %w", err)
 	}
 
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get affected rows: %w", err)
-	}
-
-	if affected == 0 {
+	if result.RowsAffected() == 0 {
 		return fmt.Errorf("user not found: id=%d", userID)
 	}
 
@@ -166,7 +163,7 @@ func (r *PostgresRepository) UpdateLastActive(ctx context.Context, userID int) e
 // UserExists checks if a user exists
 func (r *PostgresRepository) UserExists(ctx context.Context, username string) (bool, error) {
 	var exists bool
-	err := r.db.QueryRowContext(
+	err := r.db.QueryRow(
 		ctx,
 		`SELECT EXISTS(SELECT 1 FROM consolidation_users WHERE username = $1)`,
 		username,

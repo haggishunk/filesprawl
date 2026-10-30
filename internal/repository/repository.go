@@ -42,6 +42,11 @@ func NewObjectRepository(d database.Database) *ObjectRepository {
 	return &ObjectRepository{db: d}
 }
 
+// GetDatabase returns the underlying Database interface
+func (r *ObjectRepository) GetDatabase() database.Database {
+	return r.db
+}
+
 func (r *ObjectRepository) WriteHash(ctx context.Context, h *object.Hash) error {
 	// write to database if not exists
 	// return new or existing id
