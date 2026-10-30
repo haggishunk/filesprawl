@@ -299,3 +299,86 @@ func TestEnrich_EmptyGroups(t *testing.T) {
 	}
 }
 
+// TestGetLargestDuplicateGroups_ReturnsTopN tests that largest groups are returned in descending order.
+func TestGetLargestDuplicateGroups_ReturnsTopN(t *testing.T) {
+	groups := []DuplicateGroup{
+		{HashValue: "hash1", Count: 5, Files: []FileInfo{{Name: "a"}}},
+		{HashValue: "hash2", Count: 20, Files: []FileInfo{{Name: "b"}}},
+		{HashValue: "hash3", Count: 10, Files: []FileInfo{{Name: "c"}}},
+		{HashValue: "hash4", Count: 8, Files: []FileInfo{{Name: "d"}}},
+		{HashValue: "hash5", Count: 15, Files: []FileInfo{{Name: "e"}}},
+	}
+
+	largest := GetLargestDuplicateGroups(groups, 3)
+
+	if len(largest) != 3 {
+		t.Fatalf("expected 3 groups, got %d", len(largest))
+	}
+	if largest[0].Count != 20 {
+		t.Errorf("expected first group count 20, got %d", largest[0].Count)
+	}
+	if largest[1].Count != 15 {
+		t.Errorf("expected second group count 15, got %d", largest[1].Count)
+	}
+	if largest[2].Count != 10 {
+		t.Errorf("expected third group count 10, got %d", largest[2].Count)
+	}
+}
+
+// TestGetLargestDuplicateGroups_RequestMoreThanAvailable returns all groups.
+func TestGetLargestDuplicateGroups_RequestMoreThanAvailable(t *testing.T) {
+	groups := []DuplicateGroup{
+		{HashValue: "hash1", Count: 5},
+		{HashValue: "hash2", Count: 10},
+	}
+
+	largest := GetLargestDuplicateGroups(groups, 100)
+
+	if len(largest) != 2 {
+		t.Fatalf("expected 2 groups (all available), got %d", len(largest))
+	}
+}
+
+// TestGetLargestDuplicateGroups_ZeroOrNegative returns empty slice.
+func TestGetLargestDuplicateGroups_ZeroOrNegative(t *testing.T) {
+	groups := []DuplicateGroup{
+		{HashValue: "hash1", Count: 5},
+		{HashValue: "hash2", Count: 10},
+	}
+
+	if largest := GetLargestDuplicateGroups(groups, 0); len(largest) != 0 {
+		t.Errorf("expected 0 groups for n=0, got %d", len(largest))
+	}
+
+	if largest := GetLargestDuplicateGroups(groups, -5); len(largest) != 0 {
+		t.Errorf("expected 0 groups for n=-5, got %d", len(largest))
+	}
+}
+
+// TestGetLargestDuplicateGroups_EmptyInput returns empty slice.
+func TestGetLargestDuplicateGroups_EmptyInput(t *testing.T) {
+	var groups []DuplicateGroup
+	largest := GetLargestDuplicateGroups(groups, 10)
+	if len(largest) != 0 {
+		t.Errorf("expected 0 groups for empty input, got %d", len(largest))
+	}
+}
+
+// TestGetLargestDuplicateGroups_PreservesOriginal verifies that the original slice is not modified.
+func TestGetLargestDuplicateGroups_PreservesOriginal(t *testing.T) {
+	groups := []DuplicateGroup{
+		{HashValue: "hash1", Count: 5},
+		{HashValue: "hash2", Count: 20},
+		{HashValue: "hash3", Count: 10},
+	}
+	original := make([]DuplicateGroup, len(groups))
+	copy(original, groups)
+
+	GetLargestDuplicateGroups(groups, 2)
+
+	// Verify original was not modified
+	if groups[0].Count != original[0].Count || groups[1].Count != original[1].Count {
+		t.Error("original slice was modified by GetLargestDuplicateGroups")
+	}
+}
+
