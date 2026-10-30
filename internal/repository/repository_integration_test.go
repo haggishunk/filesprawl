@@ -196,7 +196,7 @@ func TestIntegration_PersistResult_PersistsRemoteAssociations(t *testing.T) {
 
 	stamp := time.Now().Format("150405.000")
 	remoteName := "integ_remote_" + stamp + ":"
-	rem := remote.NewRemote("integ-host", remoteName)
+	rem := remote.NewRcloneRemote("integ_remote_host", remoteName)
 
 	item1 := rclone.ListResponseItem{
 		Name:     "a.txt",
@@ -230,8 +230,8 @@ func TestIntegration_PersistResult_PersistsRemoteAssociations(t *testing.T) {
 
 	var remoteCount int
 	err := repo.db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM remote WHERE remote_name = $1 AND hostname = $2 AND remote_type = $3`,
-		rem.Name, rem.Hostname, rem.Type,
+		`SELECT COUNT(*) FROM remote WHERE remote_name = $1 AND location_id = $2`,
+		rem.Name, rem.LocationId,
 	).Scan(&remoteCount)
 	if err != nil {
 		t.Fatalf("count remote rows: %v", err)
@@ -261,8 +261,8 @@ func TestIntegration_PersistLocalResult_ScanRootDeduplication(t *testing.T) {
 	stamp := time.Now().Format("150405.000")
 	rootA := "/integ/photos-" + stamp
 	rootB := "/integ/photos-alt-" + stamp
-	remA := remote.NewRemote("integ-host", rootA, remote.WithRemoteType("local"))
-	remB := remote.NewRemote("integ-host", rootB, remote.WithRemoteType("local"))
+	remA := remote.NewLocalRemote("integ-host", rootA)
+	remB := remote.NewLocalRemote("integ-host", rootB)
 
 	// Same file name and content scanned under two different roots
 	hashVal := "integ-crossroot-hash-" + stamp
@@ -335,7 +335,7 @@ func TestIntegration_PersistLocalResult_SymlinkMarked(t *testing.T) {
 
 	stamp := time.Now().Format("150405.000")
 	root := "/integ/links-" + stamp
-	rem := remote.NewRemote("integ-host", root, remote.WithRemoteType("local"))
+	rem := remote.NewLocalRemote("integ-host", root)
 
 	m := object.NewMeta("link.txt", "link.txt", "application/octet-stream",
 		object.WithMetaSize(8), object.WithMetaSymlink(true), object.WithMetaScanRoot(root))
@@ -506,16 +506,16 @@ func writeMetaWithSize(t *testing.T, ctx context.Context, repo *ObjectRepository
 }
 
 // TestFindDuplicatesWithinRemote_WithHostnamePrefix tests Issue #7 fix:
-// FindDuplicatesWithinRemote should accept both "remote_name" and "hostname/remote_name" formats.
+// FindDuplicatesWithinRemote should accept both "remote_name" and "location_name/remote_name" formats.
 func TestFindDuplicatesWithinRemote_WithHostnamePrefix(t *testing.T) {
 	pool := openTestDB(t)
 	repo := NewObjectRepository(database.NewPgxDatabase(pool))
 	ctx := context.Background()
 
-	// Create a remote with hostname and name
-	host := "testhost"
+	// Create a remote (rclone remote)
+	locationName := "testhost"
 	remName := "testremote"
-	rem := remote.NewRemote(host, remName)
+	rem := remote.NewRcloneRemote(locationName, remName)
 	if err := repo.WriteRemote(ctx, &rem); err != nil {
 		t.Fatalf("WriteRemote failed: %v", err)
 	}
@@ -533,8 +533,8 @@ func TestFindDuplicatesWithinRemote_WithHostnamePrefix(t *testing.T) {
 		t.Fatalf("failed to link metadata to remote: %v", err)
 	}
 
-	// Test 1: Query with "hostname/remote_name" format (as shown in report)
-	groups1, err := repo.FindDuplicatesWithinRemote(ctx, host+"/"+remName, "", 0, 0)
+	// Test 1: Query with "location_name/remote_name" format (as shown in report)
+	groups1, err := repo.FindDuplicatesWithinRemote(ctx, locationName+"/"+remName, "", 0, 0)
 	if err != nil {
 		t.Fatalf("FindDuplicatesWithinRemote with hostname/name failed: %v", err)
 	}
@@ -571,10 +571,10 @@ func TestFindDuplicatesWithinRemote_HostnamePrefixedPath(t *testing.T) {
 	repo := NewObjectRepository(database.NewPgxDatabase(pool))
 	ctx := context.Background()
 
-	// Create a remote representing a local scan path with hostname
+	// Create a remote representing a local scan path
 	host := "archlinux"
 	remName := "/tmp/fs-test.xyz/light" // Local scan path
-	rem := remote.NewRemote(host, remName)
+	rem := remote.NewLocalRemote(host, remName)
 	if err := repo.WriteRemote(ctx, &rem); err != nil {
 		t.Fatalf("WriteRemote failed: %v", err)
 	}

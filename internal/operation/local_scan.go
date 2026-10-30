@@ -172,7 +172,7 @@ func localRemote(scanRoot string) (remote.Remote, error) {
 	if err != nil {
 		return remote.Remote{}, fmt.Errorf("failed to get hostname: %w", err)
 	}
-	return remote.NewRemote(hostname, scanRoot, remote.WithRemoteType("local")), nil
+	return remote.NewLocalRemote(hostname, scanRoot), nil
 }
 
 func computeHashes(file *os.File, hashes map[string]string) error {

@@ -1,10 +1,14 @@
 package remote
 
+import (
+	"github.com/haggishunk/filesprawl/internal/location"
+)
+
 type Remote struct {
 	Id        int
-	Hostname  string
-	Name      string // different hosts may have same remote with different name
-	Type      string
+	LocationId int // FK to location table
+	Location  location.Location
+	Name      string // path or remote name within the location
 	Persisted bool
 }
 
@@ -16,18 +20,21 @@ func WithRemoteID(id int) RemoteOption {
 	}
 }
 
-func WithRemoteType(kind string) RemoteOption {
+func WithLocation(loc location.Location) RemoteOption {
 	return func(r *Remote) {
-		r.Type = kind
+		r.Location = loc
+		r.LocationId = loc.Id
 	}
 }
 
-func NewRemote(hostname string, name string, options ...RemoteOption) Remote {
+// NewRemote creates a remote for the given location and name.
+// name: path/subdirectory for local scans or remote name for rclone
+func NewRemote(loc location.Location, name string, options ...RemoteOption) Remote {
 	r := Remote{
 		Id:        -1,
-		Hostname:  hostname,
+		LocationId: loc.Id,
+		Location:  loc,
 		Name:      name,
-		Type:      "rclone",
 		Persisted: false,
 	}
 
@@ -36,4 +43,20 @@ func NewRemote(hostname string, name string, options ...RemoteOption) Remote {
 	}
 
 	return r
+}
+
+// NewLocalRemote creates a remote for a local scan.
+// hostname: the machine hostname
+// name: the path/directory name
+func NewLocalRemote(hostname string, name string, options ...RemoteOption) Remote {
+	loc := location.LocalLocation(hostname)
+	return NewRemote(loc, name, options...)
+}
+
+// NewRcloneRemote creates a remote for an rclone remote.
+// remoteName: the rclone remote identifier
+// path: the path within the remote
+func NewRcloneRemote(remoteName string, path string, options ...RemoteOption) Remote {
+	loc := location.RemoteLocation(remoteName)
+	return NewRemote(loc, path, options...)
 }

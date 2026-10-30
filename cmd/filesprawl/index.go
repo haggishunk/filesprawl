@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/haggishunk/filesprawl/internal/cli"
 	"github.com/haggishunk/filesprawl/internal/operation"
@@ -46,17 +45,12 @@ func runIndexCmd(cmd *cobra.Command, _ []string) error {
 	}
 	defer cleanup()
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		return fmt.Errorf("failed to determine hostname: %w", err)
-	}
-
 	remoteName := normalizeRemoteName(indexRemote)
 	if remoteName == "" {
 		return fmt.Errorf("remote name is required")
 	}
 
-	rem := remote.NewRemote(hostname, remoteName)
+	rem := remote.NewRcloneRemote(remoteName, indexPath)
 	scn := operation.NewScanner(
 		operation.WithRemote(&rem),
 		operation.WithRepo(repo),
@@ -69,7 +63,7 @@ func runIndexCmd(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	_, err = fmt.Fprintf(cmd.OutOrStdout(), "indexed remote %s from host %s\n", rem.Name, rem.Hostname)
+	_, err = fmt.Fprintf(cmd.OutOrStdout(), "indexed remote %s from location %s\n", rem.Name, rem.Location.Name)
 	if err != nil {
 		return fmt.Errorf("failed to write index result: %w", err)
 	}
