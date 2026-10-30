@@ -656,62 +656,78 @@ type HashTypePair struct {
 // The key is a combination of "hashValue:hashType" for stable lookup.
 type FilesByHashMap map[string][]FileRecord
 
-// GetFilesByHashes returns all files for multiple hash values in a single query.
+// GetFilesByHashes returns all files for multiple hash values in batches to avoid stack depth limits.
 // Use minSize=0 to return files of any size.
 // Returns a map keyed by "hashValue:hashType" for efficient group enrichment.
+// Processes hashes in batches of 1000 to avoid PostgreSQL stack depth limit exceeded errors.
 func (r *ObjectRepository) GetFilesByHashes(ctx context.Context, hashes []HashTypePair, minSize int64) (FilesByHashMap, error) {
 	if len(hashes) == 0 {
 		return FilesByHashMap{}, nil
 	}
 
-	// Build the WHERE clause for all hashes: (hash_value, hash_type) IN (...)
-	// We use ARRAY of ROW to pass multiple hash/type pairs
-	statement := `
-		SELECT om.id, om.object_name, om.object_path, om.object_mime_type, om.object_size,
-		       COALESCE(rem.remote_name, ''), COALESCE(rem.hostname, ''), COALESCE(om.scan_root, ''),
-		       oh.hash_value, oh.hash_type::text
-		FROM object_meta om
-		JOIN object_hash_junction ohj ON om.id = ohj.object_meta_id
-		JOIN object_hash oh ON ohj.object_hash_id = oh.id
-		LEFT JOIN object_remote_junction orj ON om.id = orj.object_meta_id
-		LEFT JOIN remote rem ON orj.remote_id = rem.id
-		WHERE (oh.hash_value, oh.hash_type::text) IN (
-	`
-
-	// Build the VALUES clause dynamically
-	args := []interface{}{minSize}
-	for i, h := range hashes {
-		if i > 0 {
-			statement += ", "
-		}
-		statement += fmt.Sprintf("($%d::text, $%d::text)", len(args)+1, len(args)+2)
-		args = append(args, h.HashValue, h.HashType)
-	}
-
-	statement += `
-		)
-		AND om.object_size >= $1
-		ORDER BY oh.hash_value, oh.hash_type;
-	`
-
-	rows, err := r.db.Query(ctx, statement, args...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to batch query files by hashes: %w", err)
-	}
-	defer rows.Close()
-
 	result := make(FilesByHashMap)
-	for rows.Next() {
-		var f FileRecord
-		var hashValue, hashType string
-		if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size, &f.RemoteName, &f.Hostname, &f.ScanRoot, &hashValue, &hashType); err != nil {
-			return nil, fmt.Errorf("failed to scan file record in batch: %w", err)
+
+	// Process hashes in batches to avoid stack depth limit exceeded error
+	// PostgreSQL has limits on the number of elements in an IN clause
+	const batchSize = 1000
+
+	for batchStart := 0; batchStart < len(hashes); batchStart += batchSize {
+		batchEnd := batchStart + batchSize
+		if batchEnd > len(hashes) {
+			batchEnd = len(hashes)
 		}
-		key := hashValue + ":" + hashType
-		result[key] = append(result[key], f)
+
+		batch := hashes[batchStart:batchEnd]
+
+		// Build the WHERE clause for this batch: (hash_value, hash_type) IN (...)
+		statement := `
+			SELECT om.id, om.object_name, om.object_path, om.object_mime_type, om.object_size,
+			       COALESCE(rem.remote_name, ''), COALESCE(rem.hostname, ''), COALESCE(om.scan_root, ''),
+			       oh.hash_value, oh.hash_type::text
+			FROM object_meta om
+			JOIN object_hash_junction ohj ON om.id = ohj.object_meta_id
+			JOIN object_hash oh ON ohj.object_hash_id = oh.id
+			LEFT JOIN object_remote_junction orj ON om.id = orj.object_meta_id
+			LEFT JOIN remote rem ON orj.remote_id = rem.id
+			WHERE (oh.hash_value, oh.hash_type::text) IN (
+		`
+
+		// Build the VALUES clause dynamically for this batch
+		args := []interface{}{minSize}
+		for i, h := range batch {
+			if i > 0 {
+				statement += ", "
+			}
+			statement += fmt.Sprintf("($%d::text, $%d::text)", len(args)+1, len(args)+2)
+			args = append(args, h.HashValue, h.HashType)
+		}
+
+		statement += `
+			)
+			AND om.object_size >= $1
+			ORDER BY oh.hash_value, oh.hash_type;
+		`
+
+		rows, err := r.db.Query(ctx, statement, args...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to batch query files by hashes (batch %d-%d): %w", batchStart, batchEnd, err)
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var f FileRecord
+			var hashValue, hashType string
+			if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size, &f.RemoteName, &f.Hostname, &f.ScanRoot, &hashValue, &hashType); err != nil {
+				return nil, fmt.Errorf("failed to scan file record in batch: %w", err)
+			}
+			key := hashValue + ":" + hashType
+			result[key] = append(result[key], f)
+		}
+
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("error iterating file records in batch (batch %d-%d): %w", batchStart, batchEnd, err)
+		}
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating file records in batch: %w", err)
-	}
+
 	return result, nil
 }
