@@ -19,21 +19,33 @@
 - [ ] 3.3 Create consolidation decision engine (with memory of past choices)
 - [ ] 3.4 Implement file move/copy operations via rclone RC API
 
-## Phase 4: Preview & Discovery
-- [ ] 4.1 Implement image thumbnail generation (`internal/previews`)
-- [ ] 4.2 Add terminal-friendly image display (ANSI art or external viewer)
-- [ ] 4.3 Create interactive duplicate review interface (TUI/CLI)
+## Phase 4: Dual-View Browsing Interface
+- [ ] 4.1 Create `internal/consolidation/browsing` package
+- [ ] 4.2 Implement hash-centric view renderer (group by content hash)
+- [ ] 4.3 Implement filename-centric view renderer (group by filename)
+- [ ] 4.4 Implement location presence indicator system (🟢/🟡/🔴 color coding)
+- [ ] 4.5 Implement file flagging state machine (KEEP/ARCHIVE/DELETE/SKIP)
+- [ ] 4.6 Implement view switching (hash ↔ filename)
+- [ ] 4.7 Implement decision summary display (grouped by action type)
 
-## Phase 5: Interactive Command with Safety Display
+## Phase 4b: Preview & Discovery
+- [ ] 4b.1 Implement image thumbnail generation (`internal/previews`)
+- [ ] 4b.2 Add terminal-friendly image display (ANSI art or external viewer)
+- [ ] 4b.3 Integrate previews with browsing interface (overlay on files)
+
+## Phase 5: Interactive Command with Safety & Browsing
 - [ ] 5.1 Implement `consolidate` command (`cmd/filesprawl/consolidate.go`)
 - [ ] 5.2 Integrate safety checks into consolidation analysis phase
 - [ ] 5.3 Build safety panel display (consolidated view of all three safety checks)
-- [ ] 5.4 Build interactive prompt workflow (discovery → safety review → preview → decision → execute)
-- [ ] 5.5 Add consolidation progress tracking and rollback capability
-- [ ] 5.6 Add flags for batch mode (auto-consolidate using preferences)
+- [ ] 5.4 Integrate dual-view browsing interface into command workflow
+- [ ] 5.5 Build interactive prompt workflow (discovery → safety → browse by hash/filename → flag decisions → summary → execute)
+- [ ] 5.6 Implement keyboard shortcut system (k/a/d for keep/archive/delete, TAB for view switching)
+- [ ] 5.7 Add consolidation progress tracking and rollback capability
+- [ ] 5.8 Add flags for batch mode (auto-consolidate using preferences)
 
 ## Phase 6: Advanced Features (Optional)
 - [ ] 6.1 Implement DigiKam database integration (`internal/digikam`)
 - [ ] 6.2 Add smart consolidation (photo detection, rating-based selection)
 - [ ] 6.3 Add consolidation report generation
-- [ ] 6.4 Integration tests for end-to-end consolidation workflow
+- [ ] 6.4 Add search/filter in browsing interface (find by hash substring, filename pattern)
+- [ ] 6.5 Integration tests for end-to-end consolidation workflow

@@ -30,6 +30,11 @@ Users have large numbers of duplicates across multiple remotes (e.g., 57k+ group
    - **Completeness Verification**: Detect 0-byte vs non-zero copies; ensure complete copies exist elsewhere before consolidation
    - **Directory Safety Check**: Verify all files in consolidation directory exist elsewhere; block if risky files detected
 7. **Safety Display**: Present consolidated safety panel during interactive mode showing name collision status, completeness status, and directory deletion safety
+8. **Dual-View Browsing**: Hash-centric and filename-centric views for understanding duplicate relationships
+   - **Hash View**: Group by content (hash), show all variants across locations
+   - **Filename View**: Group by name, show all different versions (hashes)
+   - **Decision Flagging**: Individual file marking for keep/archive/delete with persistent state
+9. **Location Presence Indicators**: Color-coded status (🟢 green/🟡 yellow/🔴 red) showing backup replication health and single-point-of-failure warnings
 
 ## Risks
 - **Large batches**: 118k+ groups could overwhelm terminal. Mitigation: paginate, batch mode, progress bars
@@ -66,3 +71,94 @@ During interactive consolidation, present one-page safety summary:
 📂 Directory Safety: ✅/⚠️/🚨 (X safe, Y risky)
 ```
 User can expand each section for details before confirming consolidation.
+
+## Dual-View Browsing Interface Architecture
+
+### Hash-Centric View (Browse by Content)
+```
+View: By Hash (47 total copies)
+═══════════════════════════════════════════
+
+Hash abc123... (47 copies)  [Expand ▼]
+├─ 🟢 archlinux//goblet/light (local)      — 3 copies
+│  ├─ photo.jpg @ /2020/03/10/
+│  ├─ photo.jpg @ /2020/04/15/
+│  └─ photo.jpg @ /2019/misc/
+├─ 🟢 archlinux/do (dropbox)               — 2 copies
+│  ├─ photo.jpg @ /photos/2020/
+│  └─ photo.jpg @ /old-photos/
+└─ 🟢 s3-backup/archive (S3)               — 1 copy
+   └─ photo.jpg @ /archive/recovered/
+
+[k]eep  [a]rchive  [d]elete  [TAB]switch view
+```
+
+**Advantage**: See complete duplication picture for one piece of content
+**Use Case**: "Is this file backed up well enough to delete one copy?"
+
+### Filename-Centric View (Browse by Name)
+```
+View: By Filename (118k files with variants)
+═══════════════════════════════════════════
+
+photo.jpg (5 different versions)  [Expand ▼]
+├─ Version 1 (hash abc123... — 47 copies)
+│  ├─ 🟢 archlinux//goblet/light — 3
+│  ├─ 🟢 archlinux/do — 2
+│  └─ 🟢 s3-backup — 1
+├─ Version 2 (hash xyz789... — 12 copies)
+│  ├─ 🟢 archlinux//goblet/light — 2
+│  └─ 🟡 old-archive — 1
+├─ Version 3 (hash 000fff... — 0 bytes — 8 copies)
+│  ├─ 🔴 archlinux//goblet — ONLY copy
+│  └─ 🔴 google-photos — ONLY copy
+...
+
+[k]eep  [a]rchive  [d]elete  [TAB]switch view
+```
+
+**Advantage**: Understand all versions of "the same" file at once
+**Use Case**: "Which version of photo.jpg should I keep?"
+
+### Location Presence Indicators
+- 🟢 **Green**: Multiple copies across locations (safe to delete one)
+- 🟡 **Yellow**: Limited replication (only 1-2 locations, recommend backup)
+- 🔴 **Red**: Only copy in entire system (CRITICAL - no backup exists!)
+
+### Decision State Machine per File
+```
+┌─────────────────────────────────────┐
+│          Initial State               │
+│  (no flag/decision made)             │
+└────────────┬────────────────────────┘
+             │
+    ┌────────┼────────┬────────┐
+    │        │        │        │
+    ▼        ▼        ▼        ▼
+ [KEEP]   [ARCH]   [DEL]   [SKIP]
+    │        │        │        │
+    └────────┼────────┼────────┘
+             │
+    ┌────────▼────────┐
+    │ Summary Screen  │
+    │ for Execution   │
+    └─────────────────┘
+```
+
+User can:
+- Flag individual files with keyboard shortcuts
+- Toggle flags while browsing
+- View summary grouped by action (KEEP/ARCHIVE/DELETE)
+- Modify decisions in summary view
+- Execute consolidation only on flagged files
+
+### Data Model for Browsing State
+```
+type ConsolidationSession {
+  DuplicateGroup duplicates
+  Map[FileID] decision (KEEP | ARCHIVE | DELETE | SKIP)
+  CurrentView (BY_HASH | BY_FILENAME)
+  ExpandedItems Set[FileID | HashID]
+  PageCursor Position
+}
+```
