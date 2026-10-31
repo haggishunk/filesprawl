@@ -94,8 +94,32 @@ func (ca *ConsolidationApp) Run(duplicateGroups []browsing.DuplicateGroup) error
 
 // runBrowsingUI runs the interactive browsing interface
 func (ca *ConsolidationApp) runBrowsingUI() error {
-	// For now, render to string output (Phase 5 placeholder)
-	// In Phase 6, this would use gotui full rendering
+	if ca.ctx == nil || ca.sessionManager == nil || ca.flagManager == nil {
+		return fmt.Errorf("app not fully initialized for browsing")
+	}
+
+	// TODO: Phase 4 - Create real gotui app instance
+	// For now, use a placeholder app object
+	var app interface{} = nil
+
+	// Create BrowsingScreen
+	browsingScreen := screens.NewBrowsingScreen(
+		ca.sessionManager,
+		ca.flagManager,
+		ca.hashWidget,
+		ca.filenameWidget,
+		widgets.NewDetailsWidget(),
+	)
+
+	if browsingScreen == nil {
+		return fmt.Errorf("failed to create browsing screen")
+	}
+
+	// Run interactive browsing
+	if err := browsingScreen.Show(ca.ctx, app); err != nil {
+		return fmt.Errorf("browsing screen failed: %w", err)
+	}
+
 	return nil
 }
 

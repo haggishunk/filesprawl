@@ -2,12 +2,13 @@ package screens
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/haggishunk/filesprawl/internal/consolidation/flags"
 )
 
 // SessionLoaderScreen handles loading previous sessions with pending flags
-// NOTE: This is a stub implementation. Full gotui integration is in progress.
 type SessionLoaderScreen struct {
 	flagRepo   flags.Repository
 	userID     int
@@ -23,26 +24,62 @@ func NewSessionLoaderScreen(flagRepo flags.Repository, userID int) *SessionLoade
 	}
 }
 
-// Show displays the session loader screen (stub implementation)
+// Show displays the session loader screen with pending flags decision
 func (sls *SessionLoaderScreen) Show(ctx context.Context) (bool, error) {
-	// Check for pending flags
-	userFlags, err := sls.flagRepo.GetFlagsByUser(ctx, sls.userID)
+	// Get pending flags count
+	pendingCount, err := sls.getPendingFlagsCount(ctx)
 	if err != nil {
-		return true, nil // Continue with new session on error
+		// On error, start fresh
+		return true, nil
 	}
 
-	hasPending := len(userFlags) > 0
-	sls.hasPending = hasPending
-	sls.flagCount = len(userFlags)
+	sls.flagCount = pendingCount
+	sls.hasPending = pendingCount > 0
 
-	if !hasPending {
+	if !sls.hasPending {
 		// No pending flags, start fresh
 		return true, nil
 	}
 
-	// TODO: Implement full gotui-based session loader screen
-	// For now, automatically resume session with pending flags
-	return true, nil
+	// Show decision modal
+	return sls.showDecisionModal(pendingCount)
+}
+
+// getPendingFlagsCount retrieves the count of pending flags for the user
+func (sls *SessionLoaderScreen) getPendingFlagsCount(ctx context.Context) (int, error) {
+	if sls.flagRepo == nil {
+		return 0, fmt.Errorf("flag repository not initialized")
+	}
+
+	userFlags, err := sls.flagRepo.GetFlagsByUser(ctx, sls.userID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get user flags: %w", err)
+	}
+
+	return len(userFlags), nil
+}
+
+// showDecisionModal displays the modal asking whether to resume or start fresh
+func (sls *SessionLoaderScreen) showDecisionModal(count int) (bool, error) {
+	// TODO: Phase 4 - Implement full gotui modal for session decision
+	// For now, use console-based input as placeholder
+
+	fmt.Printf("You have %d pending flags from a previous session.\n", count)
+	fmt.Print("Resume session? [y/n]: ")
+
+	var response string
+	_, err := fmt.Scanln(&response)
+	if err != nil {
+		// Default to resume on error
+		return true, nil
+	}
+
+	response = strings.ToLower(strings.TrimSpace(response))
+	if response == "y" || response == "yes" {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // HasPending returns true if there are pending flags
