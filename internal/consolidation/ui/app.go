@@ -120,6 +120,19 @@ func (ca *ConsolidationApp) runBrowsingUI() error {
 		return fmt.Errorf("browsing screen failed: %w", err)
 	}
 
+	// After browsing, show summary and ask for final confirmation
+	summaryScreen := screens.NewSummaryScreen(ca.sessionManager)
+	confirmed, err := summaryScreen.Show(ca.ctx)
+	if err != nil {
+		return fmt.Errorf("summary screen failed: %w", err)
+	}
+
+	if !confirmed {
+		fmt.Println("Session saved. Flags preserved for next session.")
+		return nil
+	}
+
+	fmt.Println("Consolidation flags confirmed. Ready for execution phase.")
 	return nil
 }
 

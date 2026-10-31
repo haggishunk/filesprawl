@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/haggishunk/filesprawl/internal/consolidation/browsing"
+	"github.com/haggishunk/filesprawl/internal/consolidation/ui/modals"
 	"github.com/haggishunk/filesprawl/internal/consolidation/ui/widgets"
 )
 
@@ -168,26 +169,30 @@ func (bs *BrowsingScreen) handleQuit(app interface{}) error {
 
 // showKeepModal displays a confirmation modal for keep action
 func (bs *BrowsingScreen) showKeepModal() (bool, error) {
-	// TODO: Phase 4 - Implement gotui modal
-	return false, fmt.Errorf("keep modal not yet implemented")
+	modal := modals.NewKeepModal()
+	result := modal.Execute()
+	return result.Confirmed, result.Error
 }
 
 // showArchiveModal displays a modal to get archive destination
 func (bs *BrowsingScreen) showArchiveModal() (string, error) {
-	// TODO: Phase 4 - Implement gotui modal
-	return "", fmt.Errorf("archive modal not yet implemented")
+	modal := modals.NewArchiveModal()
+	result := modal.Execute()
+	return result.Value, result.Error
 }
 
 // showDeleteModal displays a delete confirmation modal
 func (bs *BrowsingScreen) showDeleteModal(isCritical bool) (bool, error) {
-	// TODO: Phase 4 - Implement gotui modal
-	return false, fmt.Errorf("delete modal not yet implemented")
+	modal := modals.NewDeleteModal(isCritical)
+	result := modal.Execute()
+	return result.Confirmed, result.Error
 }
 
 // showSkipModal displays a skip confirmation modal
 func (bs *BrowsingScreen) showSkipModal() (bool, error) {
-	// TODO: Phase 4 - Implement gotui modal
-	return false, fmt.Errorf("skip modal not yet implemented")
+	modal := modals.NewSkipModal()
+	result := modal.Execute()
+	return result.Confirmed, result.Error
 }
 
 // showQuitModal displays a quit confirmation modal
