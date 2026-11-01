@@ -98,9 +98,10 @@ func (ca *ConsolidationApp) runBrowsingUI() error {
 		return fmt.Errorf("app not fully initialized for browsing")
 	}
 
-	// TODO: Phase 4 - Create real gotui app instance
-	// For now, use a placeholder app object
-	var app interface{} = nil
+	// TODO: Phase 5 gotui - Create real gotui app instance
+	// For now, use a placeholder/stub app object for console-based testing
+	// Real gotui integration will create: app := gotui.NewTerminalApp()
+	var app interface{} = struct{}{}  // Non-nil placeholder
 
 	// Create BrowsingScreen
 	browsingScreen := screens.NewBrowsingScreen(
@@ -116,6 +117,8 @@ func (ca *ConsolidationApp) runBrowsingUI() error {
 	}
 
 	// Run interactive browsing
+	// In Phase 5 gotui, this will render real TUI and block until user quits
+	// For now, this returns immediately after showing status
 	if err := browsingScreen.Show(ca.ctx, app); err != nil {
 		return fmt.Errorf("browsing screen failed: %w", err)
 	}
