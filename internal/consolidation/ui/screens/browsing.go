@@ -109,6 +109,15 @@ func (bs *BrowsingScreen) Show(ctx context.Context, app interface{}) error {
 	// 2. Add list, details, status widgets to panes
 	// 3. Set keyboard handler: app.SetKeyHandler(bs.onKeyPress)
 	// 4. Run event loop: return app.Run()
+	//
+	// Pseudo-code for full gotui integration:
+	// root := gotui.NewGrid()
+	// root.AddChild(listWidget, 0, 0, listW, contentH)
+	// root.AddChild(detailsWidget, detailsX, 0, detailsW, contentH)
+	// root.AddChild(statusWidget, 0, contentH+1, termWidth, statusH)
+	// app.SetRootView(root)
+	// app.SetKeyHandler(bs.handleKeypress)
+	// return app.Run()
 
 	return nil
 }
