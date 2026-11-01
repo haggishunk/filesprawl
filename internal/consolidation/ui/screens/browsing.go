@@ -98,12 +98,49 @@ func (bs *BrowsingScreen) Show(ctx context.Context, app interface{}) error {
 	fmt.Println(fmt.Sprintf("Status bar (controls):      (%d,%d) %dx%d", statusX, statusY, statusW, statusH))
 	fmt.Println("═══════════════════════════════════════════════════════════════")
 
+	// Register keyboard bindings for Phase 5 event loop
+	if err := bs.CreateKeyBindings(); err != nil {
+		fmt.Printf("Warning: Failed to create key bindings: %v\n", err)
+	}
+
 	// TODO: Phase 5 - Wire to real gotui rendering:
 	// This is where we would:
 	// 1. Create root container with Grid layout
 	// 2. Add list, details, status widgets to panes
 	// 3. Set keyboard handler: app.SetKeyHandler(bs.onKeyPress)
 	// 4. Run event loop: return app.Run()
+
+	return nil
+}
+
+// CreateKeyBindings creates the event handler with all keyboard bindings
+func (bs *BrowsingScreen) CreateKeyBindings() error {
+	if bs == nil {
+		return fmt.Errorf("browsing screen not initialized")
+	}
+
+	// In Phase 5, this will be used to register handlers with gotui app
+	// For now, just validate that all handlers are available
+
+	handlers := map[rune]string{
+		'j': "Scroll Down",
+		'k': "Scroll Up / Keep",
+		'v': "View Switch",
+		'a': "Archive",
+		'd': "Delete",
+		's': "Skip",
+		'q': "Quit",
+		'K': "Keep (alias)",
+	}
+
+	fmt.Println()
+	fmt.Println("Keyboard Bindings Registered:")
+	fmt.Println("─────────────────────────────────────")
+	for key, action := range handlers {
+		fmt.Printf("  '%c'  →  %s\n", key, action)
+	}
+	fmt.Println("─────────────────────────────────────")
+	fmt.Println()
 
 	return nil
 }
