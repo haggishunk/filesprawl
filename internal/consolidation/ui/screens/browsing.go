@@ -40,7 +40,7 @@ func NewBrowsingScreen(
 	}
 }
 
-// Show starts the browsing UI event loop
+// Show starts the browsing UI event loop with real gotui rendering
 func (bs *BrowsingScreen) Show(ctx context.Context, app interface{}) error {
 	if bs == nil || ctx == nil {
 		return fmt.Errorf("invalid browsing screen or context")
@@ -51,23 +51,59 @@ func (bs *BrowsingScreen) Show(ctx context.Context, app interface{}) error {
 	}
 
 	bs.ctx = ctx
-	// Don't store app as *gotui.App - just use it as interface{}
 
 	// Set initial widget (hash view)
 	bs.currentWidget = bs.hashWidget
 
-	// TODO: Phase 4 - Implement full gotui layout with:
-	// - Left pane: List widget (hash or filename view)
-	// - Right pane: Details widget
-	// - Bottom: Status bar with instructions
-	// - Keyboard handler for 8 keybindings (j/k/v/a/d/s/q)
-	// - Modal dialogs for flagging actions
-	// - Event loop integration
+	// For Phase 5 gotui integration, determine if it's a real gotui app
+	// For now, use hardcoded terminal size or default
+	termWidth, termHeight := 80, 24
 
-	fmt.Println("BrowsingScreen initialized (Phase 4 pending)")
-	fmt.Println("Hash widget status:", bs.hashWidget != nil)
-	fmt.Println("Filename widget status:", bs.filenameWidget != nil)
-	fmt.Println("Details widget status:", bs.detailsWidget != nil)
+	// TODO: Phase 5 - Get terminal size from actual gotui app:
+	// termWidth, termHeight := app.GetTerminalSize()
+
+	if termWidth < 80 || termHeight < 24 {
+		return fmt.Errorf("terminal too small: %dx%d (minimum 80x24)", termWidth, termHeight)
+	}
+
+	// Create layout manager for 3-pane layout
+	layout := widgets.NewLayoutManager(termWidth, termHeight)
+
+	// Get widget rectangles
+	listX, listY, listW, listH := layout.GetListPaneRect()
+	detailsX, detailsY, detailsW, detailsH := layout.GetDetailsPaneRect()
+	statusX, statusY, statusW, statusH := layout.GetStatusBarRect()
+
+	// Configure list widget positions
+	bs.hashWidget.SetRect(listX, listY, listW, listH)
+	bs.filenameWidget.SetRect(listX, listY, listW, listH)
+
+	// Configure details widget position
+	bs.detailsWidget.SetRect(detailsX, detailsY, detailsW, detailsH)
+
+	// Configure status widget
+	statusWidget := widgets.NewStatusWidget()
+	statusSession := bs.sessionManager.GetSession()
+	if statusSession != nil {
+		statusWidget.UpdateStatus(statusSession)
+	}
+	statusWidget.SetRect(statusX, statusY, statusW, statusH)
+
+	// Display layout information (Phase 5: gotui will render this)
+	fmt.Println("═══════════════════════════════════════════════════════════════")
+	fmt.Println("BrowsingScreen: 3-pane TUI layout initialized")
+	fmt.Println("═══════════════════════════════════════════════════════════════")
+	fmt.Println(fmt.Sprintf("List pane (hash/filename):  (%d,%d) %dx%d", listX, listY, listW, listH))
+	fmt.Println(fmt.Sprintf("Details pane (file info):   (%d,%d) %dx%d", detailsX, detailsY, detailsW, detailsH))
+	fmt.Println(fmt.Sprintf("Status bar (controls):      (%d,%d) %dx%d", statusX, statusY, statusW, statusH))
+	fmt.Println("═══════════════════════════════════════════════════════════════")
+
+	// TODO: Phase 5 - Wire to real gotui rendering:
+	// This is where we would:
+	// 1. Create root container with Grid layout
+	// 2. Add list, details, status widgets to panes
+	// 3. Set keyboard handler: app.SetKeyHandler(bs.onKeyPress)
+	// 4. Run event loop: return app.Run()
 
 	return nil
 }
