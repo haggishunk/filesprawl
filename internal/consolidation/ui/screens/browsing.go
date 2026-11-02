@@ -3,6 +3,7 @@ package screens
 import (
 	"context"
 	"fmt"
+	"image"
 
 	"github.com/haggishunk/filesprawl/internal/consolidation/browsing"
 	"github.com/haggishunk/filesprawl/internal/consolidation/ui/modals"
@@ -140,16 +141,23 @@ func (bs *BrowsingScreen) Show(ctx context.Context, app interface{}) error {
 		return fmt.Errorf("status widget extraction failed")
 	}
 
-	// 3. Configure widget rectangles
+	// 3. Wrap list widgets with event dispatcher to intercept keyboard events
+	// The wrapper routes all keyboard events to BrowsingScreen action handlers
+	wrappedListWidget := &EventDispatchWrapper{
+		widget:         hashListWidget,
+		browsingScreen: bs,
+	}
+
+	// 4. Configure widget rectangles
 	hashListWidget.SetRect(listX, listY, listW, listH)
 	filenameListWidget.SetRect(listX, listY, listW, listH)
 	detailsGotUI.SetRect(detailsX, detailsY, detailsW, detailsH)
 	statusGotUI.SetRect(statusX, statusY, statusW, statusH)
 
-	// 4. Set up Grid with widgets
+	// 5. Set up Grid with wrapped list widget for event handling
 	root.Set(
 		gotui.NewRow(float64(listH),
-			gotui.NewCol(40, hashListWidget),
+			gotui.NewCol(40, wrappedListWidget),
 			gotui.NewCol(60, detailsGotUI),
 		),
 		gotui.NewRow(float64(statusH),
@@ -516,6 +524,86 @@ func (bs *BrowsingScreen) updateListPane() error {
 	// This would trigger re-rendering of the list widget
 	// For now, the widgets handle this internally
 	return nil
+}
+
+// EventDispatchWrapper wraps a gotui widget to intercept and dispatch keyboard events
+// This implements the gotui EventHandler interface to handle keyboard input
+type EventDispatchWrapper struct {
+	widget         gotui.Widget
+	browsingScreen *BrowsingScreen
+}
+
+// HandleEvent implements gotui.EventHandler to process keyboard events
+// Returns true if the event was handled, false to let it bubble up
+func (w *EventDispatchWrapper) HandleEvent(evt gotui.Event) bool {
+	if w == nil || w.browsingScreen == nil || w.widget == nil {
+		return false
+	}
+
+	// Only handle keyboard events
+	if evt.Type != gotui.KeyboardEvent {
+		// Pass non-keyboard events to wrapped widget
+		if handler, ok := w.widget.(gotui.EventHandler); ok {
+			return handler.HandleEvent(evt)
+		}
+		return false
+	}
+
+	// Extract rune from keyboard event payload
+	// gotui passes rune as the event payload for keyboard events
+	key, ok := evt.Payload.(rune)
+	if !ok {
+		// Try to pass to wrapped widget if it can handle it
+		if handler, ok := w.widget.(gotui.EventHandler); ok {
+			return handler.HandleEvent(evt)
+		}
+		return false
+	}
+
+	// Dispatch keyboard event to BrowsingScreen handler
+	w.browsingScreen.handleKeypress(key, w.browsingScreen.app)
+
+	// Return true to indicate event was handled (don't bubble up)
+	return true
+}
+
+// Draw implements gotui.Drawable to render the wrapped widget
+func (w *EventDispatchWrapper) Draw(buf *gotui.Buffer) {
+	if w != nil && w.widget != nil {
+		// Check if widget implements Drawable
+		if drawable, ok := w.widget.(gotui.Drawable); ok {
+			drawable.Draw(buf)
+		}
+	}
+}
+
+// GetRect returns the drawing rectangle of the wrapped widget
+func (w *EventDispatchWrapper) GetRect() image.Rectangle {
+	if w != nil && w.widget != nil {
+		return w.widget.GetRect()
+	}
+	return image.Rectangle{}
+}
+
+// SetRect sets the drawing rectangle of the wrapped widget (x, y, width, height)
+func (w *EventDispatchWrapper) SetRect(x, y, width, height int) {
+	if w != nil && w.widget != nil {
+		w.widget.SetRect(x, y, width, height)
+	}
+}
+
+// Lock implements sync.Locker for the wrapped widget
+func (w *EventDispatchWrapper) Lock() {
+	if w != nil && w.widget != nil {
+		w.widget.Lock()
+	}
+}
+
+// Unlock implements sync.Locker for the wrapped widget
+func (w *EventDispatchWrapper) Unlock() {
+	if w != nil && w.widget != nil {
+		w.widget.Unlock()
+	}
 }
 
 // persistFlag saves a flag decision to the database
