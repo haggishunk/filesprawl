@@ -9,6 +9,7 @@ import (
 	"github.com/haggishunk/filesprawl/internal/consolidation/ui/screens"
 	"github.com/haggishunk/filesprawl/internal/consolidation/ui/widgets"
 	"github.com/haggishunk/filesprawl/internal/consolidation/users"
+	"github.com/metaspartan/gotui/v5"
 )
 
 // ConsolidationApp orchestrates the interactive consolidation workflow
@@ -94,8 +95,49 @@ func (ca *ConsolidationApp) Run(duplicateGroups []browsing.DuplicateGroup) error
 
 // runBrowsingUI runs the interactive browsing interface
 func (ca *ConsolidationApp) runBrowsingUI() error {
-	// For now, render to string output (Phase 5 placeholder)
-	// In Phase 6, this would use gotui full rendering
+	if ca.ctx == nil || ca.sessionManager == nil || ca.flagManager == nil {
+		return fmt.Errorf("app not fully initialized for browsing")
+	}
+
+	// Phase 5: Create real gotui app instance
+	app := gotui.NewApp()
+	if app == nil {
+		return fmt.Errorf("failed to create gotui app instance")
+	}
+
+	// Create BrowsingScreen
+	browsingScreen := screens.NewBrowsingScreen(
+		ca.sessionManager,
+		ca.flagManager,
+		ca.hashWidget,
+		ca.filenameWidget,
+		widgets.NewDetailsWidget(),
+	)
+
+	if browsingScreen == nil {
+		return fmt.Errorf("failed to create browsing screen")
+	}
+
+	// Run interactive browsing
+	// In Phase 5 gotui, this will render real TUI and block until user quits
+	// For now, this returns immediately after showing status
+	if err := browsingScreen.Show(ca.ctx, app); err != nil {
+		return fmt.Errorf("browsing screen failed: %w", err)
+	}
+
+	// After browsing, show summary and ask for final confirmation
+	summaryScreen := screens.NewSummaryScreen(ca.sessionManager)
+	confirmed, err := summaryScreen.Show(ca.ctx)
+	if err != nil {
+		return fmt.Errorf("summary screen failed: %w", err)
+	}
+
+	if !confirmed {
+		fmt.Println("Session saved. Flags preserved for next session.")
+		return nil
+	}
+
+	fmt.Println("Consolidation flags confirmed. Ready for execution phase.")
 	return nil
 }
 

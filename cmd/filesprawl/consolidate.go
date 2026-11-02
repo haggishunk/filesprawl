@@ -4,22 +4,28 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/haggishunk/filesprawl/internal/analysis"
 	"github.com/haggishunk/filesprawl/internal/cli"
-	// "github.com/haggishunk/filesprawl/internal/consolidation/execution"
-	// "github.com/haggishunk/filesprawl/internal/consolidation/flags"
-	// "github.com/haggishunk/filesprawl/internal/consolidation/ui"
-	// "github.com/haggishunk/filesprawl/internal/consolidation/users"
+	"github.com/haggishunk/filesprawl/internal/consolidation/adapter"
+	"github.com/haggishunk/filesprawl/internal/consolidation/execution"
+	"github.com/haggishunk/filesprawl/internal/consolidation/flags"
+	"github.com/haggishunk/filesprawl/internal/consolidation/ui"
+	"github.com/haggishunk/filesprawl/internal/consolidation/users"
+	"github.com/haggishunk/filesprawl/internal/repository"
 	"github.com/spf13/cobra"
 )
 
 var (
-	consolidateRemote     string
-	consolidateReview     bool
-	consolidateReviewAll  bool
-	consolidateExecute    bool
-	consolidateDryRun     bool
+	consolidateRemote        string
+	consolidateReview        bool
+	consolidateReviewAll     bool
+	consolidateExecute       bool
+	consolidateDryRun        bool
 	consolidateAcrossRemotes bool
+	consolidateUser          string
 )
+
+var _ = execution.Executor{} // quiet unused import
 
 var consolidateCmd = &cobra.Command{
 	Use:   "consolidate",
@@ -51,6 +57,7 @@ func init() {
 	consolidateCmd.Flags().BoolVar(&consolidateReviewAll, "review-all", false, "review all pending flags from previous sessions")
 	consolidateCmd.Flags().BoolVar(&consolidateExecute, "execute", false, "execute flagged consolidation operations")
 	consolidateCmd.Flags().BoolVar(&consolidateDryRun, "dry-run", false, "simulate operations without making changes (use with --execute)")
+	consolidateCmd.Flags().StringVar(&consolidateUser, "user", "", "specify user directly (skip authentication)")
 }
 
 func runConsolidateCmd(cmd *cobra.Command, args []string) error {
@@ -92,19 +99,58 @@ func runConsolidateReview(ctx context.Context, repo interface{}) error {
 		return fmt.Errorf("consolidate --review for single remote not yet implemented")
 	}
 
-	if consolidateAcrossRemotes {
-		// TODO: Get duplicates across all remotes using analyzer
-		// For now, just show placeholder message
-		fmt.Println("consolidate --review: Feature not yet implemented in TUI")
-		fmt.Println("This will start the interactive consolidation workflow with:")
-		fmt.Println("  - Hash-centric and filename-centric browsing")
-		fmt.Println("  - Multi-user flagging (keep/archive/delete)")
-		fmt.Println("  - Location presence indicators")
-		fmt.Println("  - Persistent session management")
+	if !consolidateAcrossRemotes {
+		return fmt.Errorf("must specify --remote or --across-remotes")
+	}
+
+	// Get the underlying ObjectRepository to access the database
+	objRepo, ok := repo.(*repository.ObjectRepository)
+	if !ok {
+		return fmt.Errorf("invalid repository type: expected *ObjectRepository")
+	}
+
+	// Get the database interface from the repository
+	db := objRepo.GetDatabase()
+
+	// Create user repository using the database interface
+	userRepo := users.NewPostgresRepository(db)
+
+	// Create flag repository using the database interface
+	flagRepo := flags.NewPostgresRepository(db)
+
+	// Find duplicates across all remotes
+	detector := analysis.NewDuplicateDetector(objRepo)
+	filterOpts := analysis.FilterOptions{
+		HashType: "",
+		MinSize:  0,
+		Limit:    0,
+		Offset:   0,
+	}
+
+	duplicateGroups, err := detector.FindAcrossRemotes(ctx, filterOpts)
+	if err != nil {
+		return fmt.Errorf("failed to find duplicates across remotes: %w", err)
+	}
+
+	if len(duplicateGroups) == 0 {
+		fmt.Println("No duplicates found across remotes")
 		return nil
 	}
 
-	return fmt.Errorf("must specify --remote or --across-remotes")
+	// Convert analysis duplicates to browsing duplicates
+	browsingGroups := adapter.ToGroupsForBrowsing(duplicateGroups)
+
+	// Create and run consolidation app
+	app, err := ui.NewConsolidationApp(ctx, userRepo, flagRepo)
+	if err != nil {
+		return fmt.Errorf("failed to create consolidation app: %w", err)
+	}
+
+	if err := app.Run(browsingGroups); err != nil {
+		return fmt.Errorf("consolidation workflow failed: %w", err)
+	}
+
+	return nil
 }
 
 // runConsolidateReviewAll shows all pending flags from previous sessions

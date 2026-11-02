@@ -7,7 +7,6 @@ import (
 )
 
 // FilenameCentricWidget displays files grouped by filename
-// NOTE: Phase 5 TUI integration pending. Stub implementation for now.
 type FilenameCentricWidget struct {
 	list       *BaseListWidget
 	duplicates []browsing.DuplicateGroup
@@ -25,32 +24,46 @@ func NewFilenameCentricWidget() *FilenameCentricWidget {
 	}
 }
 
-// GetWidget returns the underlying widget
+// GetWidget returns the underlying gotui.List widget
 func (w *FilenameCentricWidget) GetWidget() interface{} {
+	if w == nil || w.list == nil {
+		return nil
+	}
 	return w.list.GetWidget()
 }
 
 // UpdateData updates the widget with duplicate groups
 func (w *FilenameCentricWidget) UpdateData(data interface{}) error {
+	if w == nil {
+		return nil
+	}
 	groups, ok := data.([]browsing.DuplicateGroup)
 	if !ok {
 		return fmt.Errorf("expected []DuplicateGroup, got %T", data)
 	}
 
 	w.duplicates = groups
-	w.renderList()
+	w.renderFilenameCentricList()
 	return nil
 }
 
-// renderList renders the list based on duplicates
-func (w *FilenameCentricWidget) renderList() {
-	rows := []string{}
+// renderFilenameCentricList renders the filename-centric list items
+func (w *FilenameCentricWidget) renderFilenameCentricList() {
+	if w == nil {
+		return
+	}
 
+	rows := []string{}
 	for idx, group := range w.duplicates {
+		// DuplicateGroup is a value type, so we skip empty ones
+		if group.Identifier == "" {
+			continue
+		}
+
 		indicator := w.analyzer.AnalyzeDuplicateGroup(group)
 		w.indicators[idx] = indicator
 
-		// Format: indicator filename (N versions) [FLAG]
+		// Format: 🔴/🟡/🟢 filename (version_count versions) [FLAG]
 		versionCount := len(group.Versions)
 		versionWord := "version"
 		if versionCount > 1 {
@@ -72,11 +85,16 @@ func (w *FilenameCentricWidget) renderList() {
 		rows = append(rows, row)
 	}
 
-	w.list.SetRows(rows)
+	if w.list != nil {
+		w.list.SetRows(rows)
+	}
 }
 
 // GetSelectedGroup returns the currently selected duplicate group
 func (w *FilenameCentricWidget) GetSelectedGroup() *browsing.DuplicateGroup {
+	if w == nil || w.list == nil {
+		return nil
+	}
 	idx := w.list.GetSelectedIndex()
 	if idx >= 0 && idx < len(w.duplicates) {
 		return &w.duplicates[idx]
@@ -86,44 +104,63 @@ func (w *FilenameCentricWidget) GetSelectedGroup() *browsing.DuplicateGroup {
 
 // GetSelectedIndex returns the currently selected item index
 func (w *FilenameCentricWidget) GetSelectedIndex() int {
+	if w == nil || w.list == nil {
+		return 0
+	}
 	return w.list.GetSelectedIndex()
 }
 
 // SetSelectedIndex sets the selected item index
 func (w *FilenameCentricWidget) SetSelectedIndex(index int) error {
+	if w == nil || w.list == nil {
+		return nil
+	}
 	return w.list.SetSelectedIndex(index)
 }
 
 // GetTitle returns the widget title
 func (w *FilenameCentricWidget) GetTitle() string {
+	if w == nil || w.list == nil {
+		return ""
+	}
 	return w.list.GetTitle()
 }
 
 // HandleKeypress handles keyboard input
 func (w *FilenameCentricWidget) HandleKeypress(key rune) error {
+	if w == nil || w.list == nil {
+		return nil
+	}
 	switch key {
-	case 'j', 'k': // vim-style navigation
-		if key == 'j' {
-			w.list.ScrollDown()
-		} else {
-			w.list.ScrollUp()
-		}
+	case 'j': // vim-style down
+		w.list.ScrollDown()
+	case 'k': // vim-style up
+		w.list.ScrollUp()
 	}
 	return nil
 }
 
 // SetRect sets the drawing rectangle
 func (w *FilenameCentricWidget) SetRect(x, y, width, height int) {
+	if w == nil || w.list == nil {
+		return
+	}
 	w.list.SetRect(x, y, width, height)
 }
 
 // GetDuplicateCount returns total number of duplicate filenames
 func (w *FilenameCentricWidget) GetDuplicateCount() int {
+	if w == nil {
+		return 0
+	}
 	return len(w.duplicates)
 }
 
 // GetPresenceIndicator returns the indicator for a group index
 func (w *FilenameCentricWidget) GetPresenceIndicator(index int) browsing.PresenceIndicator {
+	if w == nil {
+		return browsing.PresenceGreen
+	}
 	if indicator, ok := w.indicators[index]; ok {
 		return indicator
 	}
@@ -132,7 +169,7 @@ func (w *FilenameCentricWidget) GetPresenceIndicator(index int) browsing.Presenc
 
 // GetGroupDetails returns formatted details for a filename group
 func (w *FilenameCentricWidget) GetGroupDetails(index int) string {
-	if index < 0 || index >= len(w.duplicates) {
+	if w == nil || index < 0 || index >= len(w.duplicates) {
 		return "No group selected"
 	}
 
@@ -142,10 +179,17 @@ func (w *FilenameCentricWidget) GetGroupDetails(index int) string {
 
 	// Show each version
 	for vIdx, version := range group.Versions {
+		if version.Hash == nil && version.FileInfo == nil {
+			continue
+		}
 		indicator := w.analyzer.AnalyzeFileVersion(version)
+		hashStr := ""
+		if version.Hash != nil {
+			hashStr = w.truncateHash(version.Hash.Hash, 12)
+		}
 		detail += fmt.Sprintf("Version %d: %s (%d location%s)\n",
 			vIdx+1,
-			w.truncateHash(version.Hash.Hash, 12),
+			hashStr,
 			len(version.Locations),
 			w.plural(len(version.Locations)),
 		)

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/haggishunk/filesprawl/internal/database"
 )
 
 // FlagType represents the type of consolidation decision
@@ -73,11 +75,11 @@ type Repository interface {
 
 // PostgresRepository implements Repository using PostgreSQL
 type PostgresRepository struct {
-	db *sql.DB
+	db database.Database
 }
 
 // NewPostgresRepository creates a new PostgreSQL-backed flag repository
-func NewPostgresRepository(db *sql.DB) *PostgresRepository {
+func NewPostgresRepository(db database.Database) *PostgresRepository {
 	return &PostgresRepository{db: db}
 }
 
@@ -96,7 +98,7 @@ func (r *PostgresRepository) CreateFlag(ctx context.Context, fileID int, userID 
 		ArchiveDest: archiveDest,
 	}
 
-	err := r.db.QueryRowContext(
+	err := r.db.QueryRow(
 		ctx,
 		`INSERT INTO consolidation_flags (file_id, user_id, flag_type, flagged_at, reason, archive_dest)
 		 VALUES ($1, $2, $3, $4, $5, $6)
@@ -114,7 +116,7 @@ func (r *PostgresRepository) CreateFlag(ctx context.Context, fileID int, userID 
 // GetFlag retrieves a flag by ID
 func (r *PostgresRepository) GetFlag(ctx context.Context, id int) (*Flag, error) {
 	flag := &Flag{}
-	err := r.db.QueryRowContext(
+	err := r.db.QueryRow(
 		ctx,
 		`SELECT id, file_id, user_id, flag_type, flagged_at, reason, archive_dest
 		 FROM consolidation_flags WHERE id = $1`,
@@ -133,7 +135,7 @@ func (r *PostgresRepository) GetFlag(ctx context.Context, id int) (*Flag, error)
 
 // GetFlagsByFile retrieves all flags for a file
 func (r *PostgresRepository) GetFlagsByFile(ctx context.Context, fileID int) ([]Flag, error) {
-	rows, err := r.db.QueryContext(
+	rows, err := r.db.Query(
 		ctx,
 		`SELECT id, file_id, user_id, flag_type, flagged_at, reason, archive_dest
 		 FROM consolidation_flags WHERE file_id = $1
@@ -161,7 +163,7 @@ func (r *PostgresRepository) GetFlagsByFile(ctx context.Context, fileID int) ([]
 
 // GetFlagsByUser retrieves all flags by a user
 func (r *PostgresRepository) GetFlagsByUser(ctx context.Context, userID int) ([]Flag, error) {
-	rows, err := r.db.QueryContext(
+	rows, err := r.db.Query(
 		ctx,
 		`SELECT id, file_id, user_id, flag_type, flagged_at, reason, archive_dest
 		 FROM consolidation_flags WHERE user_id = $1
@@ -189,7 +191,7 @@ func (r *PostgresRepository) GetFlagsByUser(ctx context.Context, userID int) ([]
 
 // UpdateFlag updates a flag
 func (r *PostgresRepository) UpdateFlag(ctx context.Context, flagID int, flagType FlagType, reason *string, archiveDest *string) (*Flag, error) {
-	result, err := r.db.ExecContext(
+	result, err := r.db.Exec(
 		ctx,
 		`UPDATE consolidation_flags SET flag_type = $1, reason = $2, archive_dest = $3 WHERE id = $4`,
 		string(flagType), reason, archiveDest, flagID,
@@ -198,11 +200,7 @@ func (r *PostgresRepository) UpdateFlag(ctx context.Context, flagID int, flagTyp
 		return nil, fmt.Errorf("failed to update flag: %w", err)
 	}
 
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get affected rows: %w", err)
-	}
-	if affected == 0 {
+	if result.RowsAffected() == 0 {
 		return nil, fmt.Errorf("flag not found: id=%d", flagID)
 	}
 
@@ -211,7 +209,7 @@ func (r *PostgresRepository) UpdateFlag(ctx context.Context, flagID int, flagTyp
 
 // DeleteFlag removes a flag
 func (r *PostgresRepository) DeleteFlag(ctx context.Context, flagID int) error {
-	result, err := r.db.ExecContext(
+	result, err := r.db.Exec(
 		ctx,
 		`DELETE FROM consolidation_flags WHERE id = $1`,
 		flagID,
@@ -220,11 +218,7 @@ func (r *PostgresRepository) DeleteFlag(ctx context.Context, flagID int) error {
 		return fmt.Errorf("failed to delete flag: %w", err)
 	}
 
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get affected rows: %w", err)
-	}
-	if affected == 0 {
+	if result.RowsAffected() == 0 {
 		return fmt.Errorf("flag not found: id=%d", flagID)
 	}
 
@@ -258,7 +252,7 @@ func (r *PostgresRepository) CreateReview(ctx context.Context, fileID int, origi
 		newFlagStr = &s
 	}
 
-	err := r.db.QueryRowContext(
+	err := r.db.QueryRow(
 		ctx,
 		`INSERT INTO consolidation_reviews (file_id, original_flag, original_user, original_at, reviewed_by, reviewed_at, new_flag, review_reason)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -275,7 +269,7 @@ func (r *PostgresRepository) CreateReview(ctx context.Context, fileID int, origi
 
 // GetReviewsByFile retrieves all reviews for a file
 func (r *PostgresRepository) GetReviewsByFile(ctx context.Context, fileID int) ([]Review, error) {
-	rows, err := r.db.QueryContext(
+	rows, err := r.db.Query(
 		ctx,
 		`SELECT id, file_id, original_flag, original_user, original_at, reviewed_by, reviewed_at, new_flag, review_reason
 		 FROM consolidation_reviews WHERE file_id = $1
@@ -310,7 +304,7 @@ func (r *PostgresRepository) GetReviewsByFile(ctx context.Context, fileID int) (
 
 // GetReviewsByUser retrieves all reviews by a user
 func (r *PostgresRepository) GetReviewsByUser(ctx context.Context, userID int) ([]Review, error) {
-	rows, err := r.db.QueryContext(
+	rows, err := r.db.Query(
 		ctx,
 		`SELECT id, file_id, original_flag, original_user, original_at, reviewed_by, reviewed_at, new_flag, review_reason
 		 FROM consolidation_reviews WHERE reviewed_by = $1
