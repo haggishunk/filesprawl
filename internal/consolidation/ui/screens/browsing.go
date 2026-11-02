@@ -240,6 +240,10 @@ func (bs *BrowsingScreen) handleScrollDown() {
 	// TODO: Phase 4 - Implement scrolling via gotui widgets
 	if bs.currentWidget != nil {
 		_ = bs.currentWidget.HandleKeypress('j')
+		// Update details pane to show the new selection
+		if err := bs.updateDetailsPane(); err != nil {
+			fmt.Printf("Warning: Failed to update details pane: %v\n", err)
+		}
 	}
 }
 
@@ -248,6 +252,10 @@ func (bs *BrowsingScreen) handleScrollUp() {
 	// TODO: Phase 4 - Implement scrolling via gotui widgets
 	if bs.currentWidget != nil {
 		_ = bs.currentWidget.HandleKeypress('k')
+		// Update details pane to show the new selection
+		if err := bs.updateDetailsPane(); err != nil {
+			fmt.Printf("Warning: Failed to update details pane: %v\n", err)
+		}
 	}
 }
 

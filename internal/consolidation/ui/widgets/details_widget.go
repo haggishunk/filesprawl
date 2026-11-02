@@ -53,49 +53,122 @@ func (w *DetailsWidget) formatGroupDetails(group *browsing.DuplicateGroup) strin
 	}
 
 	output := ""
-	output += fmt.Sprintf("═══════════════════════════════════════\n")
-	output += fmt.Sprintf("Identifier: %s\n", group.Identifier)
-	output += fmt.Sprintf("Total Copies: %d\n", group.Count)
+	output += fmt.Sprintf("\n╔════════════════════════════════════════════════════════════════╗\n")
+	output += fmt.Sprintf("║ DUPLICATE GROUP - %s                                         ║\n", truncateStr(group.Identifier, 30))
+	output += fmt.Sprintf("╚════════════════════════════════════════════════════════════════╝\n\n")
 
+	output += fmt.Sprintf("📊 Summary: %d copies found", group.Count)
 	if group.Flag != nil {
-		output += fmt.Sprintf("Flag Status: [%s]\n", group.Flag.FlagType)
+		output += fmt.Sprintf(" │ Status: [%s]", group.Flag.FlagType)
 	}
-	output += fmt.Sprintf("\n")
+	output += "\n\n"
 
 	// Group versions
 	if len(group.Versions) == 0 {
 		output += "No versions found\n"
 	} else {
-		output += fmt.Sprintf("VERSIONS (%d):\n", len(group.Versions))
+		output += fmt.Sprintf("📋 COPIES (%d):\n", len(group.Versions))
+		output += fmt.Sprintf("─────────────────────────────────────────────────────────────────\n")
+
 		for vIdx, version := range group.Versions {
 			if version.Hash == nil && version.FileInfo == nil {
 				continue
 			}
+
 			indicator := w.analyzer.AnalyzeFileVersion(version)
-			hashStr := ""
-			if version.Hash != nil {
-				hashStr = truncateStr(version.Hash.Hash, 12)
+			flagStr := ""
+			if version.Flag != nil {
+				flagStr = fmt.Sprintf(" 🚩 [%s]", version.Flag.FlagType)
 			}
-			fileStr := ""
+
+			// File name and details
+			fileStr := "Unknown"
 			if version.FileInfo != nil {
 				fileStr = version.FileInfo.Name
 			}
-			output += fmt.Sprintf("  %d. %s %s (Hash: %s)\n", vIdx+1, indicator, fileStr, hashStr)
+
+			output += fmt.Sprintf("\n%d️⃣  %s %s%s\n", vIdx+1, indicator, fileStr, flagStr)
+
+			// Show detailed information
+			if version.FileInfo != nil {
+				meta := version.FileInfo
+				output += fmt.Sprintf("   📁 Path:     %s\n", meta.Path)
+				if meta.Size > 0 {
+					output += fmt.Sprintf("   📏 Size:     %s\n", formatSize(meta.Size))
+				}
+			}
 
 			// Show locations for this version
 			if len(version.Locations) > 0 {
+				output += fmt.Sprintf("   📍 Locations:\n")
 				for _, loc := range version.Locations {
-					output += fmt.Sprintf("     → %s (%s)\n", loc.Name, loc.Type)
+					locType := "📂"
+					if loc.Type == "remote" {
+						locType = "☁️"
+					}
+					output += fmt.Sprintf("      %s %s (%s)\n", locType, loc.Name, loc.Type)
 				}
+			} else {
+				output += fmt.Sprintf("   ⚠️  No location information\n")
 			}
-			if version.Flag != nil {
-				output += fmt.Sprintf("     [Flag: %s]\n", version.Flag.FlagType)
-			}
+		}
+
+		output += fmt.Sprintf("\n─────────────────────────────────────────────────────────────────\n")
+
+		// Show locations summary
+		output += w.formatLocationsSummary(group)
+	}
+
+	output += fmt.Sprintf("\n🎯 Actions: [K]eep | [a]rchive | [d]elete | [s]kip | [v]iew toggle\n")
+	return output
+}
+
+// formatLocationsSummary shows a summary of all locations across all copies
+func (w *DetailsWidget) formatLocationsSummary(group *browsing.DuplicateGroup) string {
+	if group == nil || len(group.Versions) == 0 {
+		return ""
+	}
+
+	output := "\n📍 Location Summary:\n"
+
+	// Collect all unique locations
+	locations := make(map[string]int)
+	for _, version := range group.Versions {
+		for _, loc := range version.Locations {
+			locations[loc.Name]++
 		}
 	}
 
-	output += fmt.Sprintf("\n═══════════════════════════════════════\n")
+	// Show which locations have copies
+	if len(locations) == 0 {
+		output += "   No location information available\n"
+	} else {
+		for locName, count := range locations {
+			indicator := "🟢"
+			if count == 1 && group.Count > 1 {
+				indicator = "🔴" // Only copy in this location
+			} else if count < group.Count {
+				indicator = "🟡" // Partial copy
+			}
+			output += fmt.Sprintf("   %s %s (%d/%d copies)\n", indicator, locName, count, group.Count)
+		}
+	}
+
 	return output
+}
+
+// formatSize formats bytes into human-readable size
+func formatSize(bytes int64) string {
+	units := []string{"B", "KB", "MB", "GB", "TB"}
+	size := float64(bytes)
+	unitIdx := 0
+
+	for size >= 1024 && unitIdx < len(units)-1 {
+		size /= 1024
+		unitIdx++
+	}
+
+	return fmt.Sprintf("%.2f %s", size, units[unitIdx])
 }
 
 // SetRect sets the drawing rectangle

@@ -72,14 +72,22 @@ func (w *FilenameCentricWidget) renderFilenameCentricList() {
 
 		flagStr := ""
 		if group.Flag != nil {
-			flagStr = fmt.Sprintf(" [%s]", group.Flag.FlagType)
+			flagStr = fmt.Sprintf(" 🚩[%s]", group.Flag.FlagType)
 		}
 
-		row := fmt.Sprintf("%s %s (%d %s)%s",
+		// Show location diversity
+		locCount := w.countLocations(group)
+		locationStr := ""
+		if locCount > 0 {
+			locationStr = fmt.Sprintf(" | 📍 %d location(s)", locCount)
+		}
+
+		row := fmt.Sprintf("%s %s (%d %s%s)%s",
 			indicator,
 			group.Identifier,
 			versionCount,
 			versionWord,
+			locationStr,
 			flagStr,
 		)
 		rows = append(rows, row)
@@ -88,6 +96,17 @@ func (w *FilenameCentricWidget) renderFilenameCentricList() {
 	if w.list != nil {
 		w.list.SetRows(rows)
 	}
+}
+
+// countLocations counts unique locations in a duplicate group
+func (w *FilenameCentricWidget) countLocations(group browsing.DuplicateGroup) int {
+	locations := make(map[string]bool)
+	for _, version := range group.Versions {
+		for _, loc := range version.Locations {
+			locations[loc.Name] = true
+		}
+	}
+	return len(locations)
 }
 
 // GetSelectedGroup returns the currently selected duplicate group

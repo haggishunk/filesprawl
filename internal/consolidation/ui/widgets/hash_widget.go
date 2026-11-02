@@ -66,13 +66,21 @@ func (w *HashCentricWidget) renderHashCentricList() {
 		// Format: 🔴/🟡/🟢 hash_prefix... (count copies) [FLAG]
 		flagStr := ""
 		if group.Flag != nil {
-			flagStr = fmt.Sprintf(" [%s]", group.Flag.FlagType)
+			flagStr = fmt.Sprintf(" 🚩[%s]", group.Flag.FlagType)
 		}
 
-		row := fmt.Sprintf("%s %s... (%d copies)%s",
+		// Show file count and locations summary
+		locCount := w.countLocations(group)
+		locationStr := ""
+		if locCount > 0 {
+			locationStr = fmt.Sprintf(" | 📍 %d location(s)", locCount)
+		}
+
+		row := fmt.Sprintf("%s %s... (%d copies%s)%s",
 			indicator,
 			w.truncateHash(group.Identifier, 8),
 			group.Count,
+			locationStr,
 			flagStr,
 		)
 		rows = append(rows, row)
@@ -81,6 +89,17 @@ func (w *HashCentricWidget) renderHashCentricList() {
 	if w.list != nil {
 		w.list.SetRows(rows)
 	}
+}
+
+// countLocations counts unique locations in a duplicate group
+func (w *HashCentricWidget) countLocations(group browsing.DuplicateGroup) int {
+	locations := make(map[string]bool)
+	for _, version := range group.Versions {
+		for _, loc := range version.Locations {
+			locations[loc.Name] = true
+		}
+	}
+	return len(locations)
 }
 
 // GetSelectedGroup returns the currently selected duplicate group
