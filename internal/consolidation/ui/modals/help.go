@@ -94,7 +94,9 @@ Press SPACE or ENTER to continue...
 
 // ShowHelpModal displays help and returns when closed
 func ShowHelpModal() error {
-	content := HelpContent()
-	fmt.Print(content)
+	// In gotui context, we can't use Scanln without disrupting the event loop
+	// For now, just acknowledge the key was pressed
+	// TODO: Implement proper gotui modal dialog for help display
+	fmt.Println("\n📖 Help modal triggered - press 'q' to continue")
 	return nil
 }

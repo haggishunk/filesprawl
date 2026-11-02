@@ -127,6 +127,11 @@ func (bs *BrowsingScreen) Show(ctx context.Context, app interface{}) error {
 	fmt.Println(fmt.Sprintf("List pane (hash/filename):  (%d,%d) %dx%d", listX, listY, listW, listH))
 	fmt.Println(fmt.Sprintf("Details pane (file info):   (%d,%d) %dx%d", detailsX, detailsY, detailsW, detailsH))
 	fmt.Println(fmt.Sprintf("Status bar (controls):      (%d,%d) %dx%d", statusX, statusY, statusW, statusH))
+
+	// Debug: Show what data is loaded
+	session := bs.sessionManager.GetSession()
+	fmt.Printf("\n📊 Data Loaded:\n")
+	fmt.Printf("   Duplicate groups: %d\n", len(session.DuplicateGroups))
 	fmt.Println("═══════════════════════════════════════════════════════════════")
 
 	// Register keyboard bindings for Phase 5 event loop
