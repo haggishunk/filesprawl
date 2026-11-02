@@ -248,41 +248,177 @@ func (bs *BrowsingScreen) handleViewSwitch() error {
 	bs.isHashView = !bs.isHashView
 	if bs.isHashView {
 		bs.currentWidget = bs.hashWidget
+		fmt.Print("\n>>> Switched to HASH VIEW - Content-centric <<<\n")
 	} else {
 		bs.currentWidget = bs.filenameWidget
+		fmt.Print("\n>>> Switched to FILENAME VIEW - Name-centric <<<\n")
 	}
+
+	// Update details pane for new view
+	if err := bs.updateDetailsPane(); err != nil {
+		fmt.Printf("Warning: Failed to update details pane: %v\n", err)
+	}
+
 	return nil
 }
 
 // handleKeep marks current item as KEEP
 func (bs *BrowsingScreen) handleKeep() error {
-	if _, err := bs.showKeepModal(); err != nil {
+	confirmed, err := bs.showKeepModal()
+	if err != nil {
 		return fmt.Errorf("keep modal failed: %w", err)
 	}
+
+	if !confirmed {
+		return nil
+	}
+
+	// Get current selection
+	selectedIdx := bs.currentWidget.GetSelectedIndex()
+	session := bs.sessionManager.GetSession()
+	if selectedIdx < 0 || selectedIdx >= len(session.DuplicateGroups) {
+		return fmt.Errorf("invalid selection index: %d", selectedIdx)
+	}
+
+	group := session.DuplicateGroups[selectedIdx]
+
+	// Flag each version of the duplicate group as KEEP
+	for _, version := range group.Versions {
+		if err := bs.flagManager.PersistKeep(bs.ctx, version.FileID); err != nil {
+			return fmt.Errorf("failed to flag file %d as KEEP: %w", version.FileID, err)
+		}
+	}
+
+	// Update UI
+	if err := bs.updateDetailsPane(); err != nil {
+		fmt.Printf("Warning: Failed to update details pane: %v\n", err)
+	}
+
 	return nil
 }
 
 // handleArchive marks current item as ARCHIVE
 func (bs *BrowsingScreen) handleArchive() error {
-	if _, err := bs.showArchiveModal(); err != nil {
+	destination, err := bs.showArchiveModal()
+	if err != nil {
 		return fmt.Errorf("archive modal failed: %w", err)
 	}
+
+	if destination == "" {
+		return nil // User cancelled
+	}
+
+	// Get current selection
+	selectedIdx := bs.currentWidget.GetSelectedIndex()
+	session := bs.sessionManager.GetSession()
+	if selectedIdx < 0 || selectedIdx >= len(session.DuplicateGroups) {
+		return fmt.Errorf("invalid selection index: %d", selectedIdx)
+	}
+
+	group := session.DuplicateGroups[selectedIdx]
+	reason := fmt.Sprintf("Archived to %s", destination)
+
+	// Flag primary version (first) as ARCHIVE; others as KEEP
+	for i, version := range group.Versions {
+		if i == 0 {
+			// Keep the first copy
+			if err := bs.flagManager.PersistKeep(bs.ctx, version.FileID); err != nil {
+				return fmt.Errorf("failed to flag primary file %d as KEEP: %w", version.FileID, err)
+			}
+		} else {
+			// Archive other copies
+			if err := bs.flagManager.PersistArchive(bs.ctx, version.FileID, destination, &reason); err != nil {
+				return fmt.Errorf("failed to flag file %d as ARCHIVE: %w", version.FileID, err)
+			}
+		}
+	}
+
+	// Update UI
+	if err := bs.updateDetailsPane(); err != nil {
+		fmt.Printf("Warning: Failed to update details pane: %v\n", err)
+	}
+
 	return nil
 }
 
 // handleDelete marks current item as DELETE
 func (bs *BrowsingScreen) handleDelete() error {
-	if _, err := bs.showDeleteModal(false); err != nil {
+	// Get current selection first to check critical status
+	selectedIdx := bs.currentWidget.GetSelectedIndex()
+	session := bs.sessionManager.GetSession()
+	if selectedIdx < 0 || selectedIdx >= len(session.DuplicateGroups) {
+		return fmt.Errorf("invalid selection index: %d", selectedIdx)
+	}
+
+	group := session.DuplicateGroups[selectedIdx]
+
+	// Check if any version is critical (only 1 location)
+	isCritical := false
+	for _, version := range group.Versions {
+		if len(version.Locations) == 1 {
+			isCritical = true
+			break
+		}
+	}
+
+	confirmed, err := bs.showDeleteModal(isCritical)
+	if err != nil {
 		return fmt.Errorf("delete modal failed: %w", err)
 	}
+
+	if !confirmed {
+		return nil
+	}
+
+	reason := "User confirmed deletion"
+
+	// Flag all versions as DELETE
+	for _, version := range group.Versions {
+		if err := bs.flagManager.PersistDelete(bs.ctx, version.FileID, &reason); err != nil {
+			return fmt.Errorf("failed to flag file %d as DELETE: %w", version.FileID, err)
+		}
+	}
+
+	// Update UI
+	if err := bs.updateDetailsPane(); err != nil {
+		fmt.Printf("Warning: Failed to update details pane: %v\n", err)
+	}
+
 	return nil
 }
 
-// handleSkip marks current item as SKIP
+// handleSkip removes any flag from current item
 func (bs *BrowsingScreen) handleSkip() error {
-	if _, err := bs.showSkipModal(); err != nil {
+	confirmed, err := bs.showSkipModal()
+	if err != nil {
 		return fmt.Errorf("skip modal failed: %w", err)
 	}
+
+	if !confirmed {
+		return nil
+	}
+
+	// Get current selection
+	selectedIdx := bs.currentWidget.GetSelectedIndex()
+	session := bs.sessionManager.GetSession()
+	if selectedIdx < 0 || selectedIdx >= len(session.DuplicateGroups) {
+		return fmt.Errorf("invalid selection index: %d", selectedIdx)
+	}
+
+	group := session.DuplicateGroups[selectedIdx]
+
+	// Remove flags from all versions
+	for _, version := range group.Versions {
+		if err := bs.flagManager.PersistSkip(bs.ctx, version.FileID); err != nil {
+			return fmt.Errorf("failed to skip file %d: %w", version.FileID, err)
+		}
+	}
+
+	// Update UI
+	if err := bs.updateDetailsPane(); err != nil {
+		fmt.Printf("Warning: Failed to update details pane: %v\n", err)
+	}
+
 	return nil
 }
 
@@ -305,7 +441,13 @@ func (bs *BrowsingScreen) showKeepModal() (bool, error) {
 func (bs *BrowsingScreen) showArchiveModal() (string, error) {
 	modal := modals.NewArchiveModal()
 	result := modal.Execute()
-	return result.Value, result.Error
+	if result.Error != nil {
+		return "", result.Error
+	}
+	if !result.Confirmed {
+		return "", nil // User cancelled
+	}
+	return result.Value, nil
 }
 
 // showDeleteModal displays a delete confirmation modal
