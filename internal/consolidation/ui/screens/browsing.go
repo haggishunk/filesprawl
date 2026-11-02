@@ -7,6 +7,8 @@ import (
 	"github.com/haggishunk/filesprawl/internal/consolidation/browsing"
 	"github.com/haggishunk/filesprawl/internal/consolidation/ui/modals"
 	"github.com/haggishunk/filesprawl/internal/consolidation/ui/widgets"
+	"github.com/metaspartan/gotui/v5"
+	gotui_widgets "github.com/metaspartan/gotui/v5/widgets"
 )
 
 // BrowsingScreen implements the interactive browsing interface for consolidation
@@ -19,6 +21,7 @@ type BrowsingScreen struct {
 	currentWidget  widgets.BrowsingWidget // pointer to current active widget
 	isHashView     bool                    // true for hash, false for filename
 	ctx            context.Context
+	app            *gotui.Application     // reference to gotui app for event handling
 }
 
 // NewBrowsingScreen creates a new browsing screen
@@ -103,23 +106,65 @@ func (bs *BrowsingScreen) Show(ctx context.Context, app interface{}) error {
 		fmt.Printf("Warning: Failed to create key bindings: %v\n", err)
 	}
 
-	// TODO: Phase 5 - Wire to real gotui rendering:
-	// This is where we would:
-	// 1. Create root container with Grid layout
-	// 2. Add list, details, status widgets to panes
-	// 3. Set keyboard handler: app.SetKeyHandler(bs.onKeyPress)
-	// 4. Run event loop: return app.Run()
-	//
-	// Pseudo-code for full gotui integration:
-	// root := gotui.NewGrid()
-	// root.AddChild(listWidget, 0, 0, listW, contentH)
-	// root.AddChild(detailsWidget, detailsX, 0, detailsW, contentH)
-	// root.AddChild(statusWidget, 0, contentH+1, termWidth, statusH)
-	// app.SetRootView(root)
-	// app.SetKeyHandler(bs.handleKeypress)
-	// return app.Run()
+	// Phase 5: Wire to real gotui rendering with Grid layout
 
-	return nil
+	// 1. Create root container with Grid layout
+	gtApp, ok := app.(*gotui.Application)
+	if !ok {
+		return fmt.Errorf("invalid gotui app type: expected *gotui.Application, got %T", app)
+	}
+
+	root := gotui.NewGrid()
+	if root == nil {
+		return fmt.Errorf("failed to create Grid container")
+	}
+
+	// 2. Extract gotui widgets from wrappers
+	hashListWidget, ok := bs.hashWidget.GetWidget().(*gotui_widgets.List)
+	if !ok || hashListWidget == nil {
+		return fmt.Errorf("hash list widget extraction failed")
+	}
+
+	filenameListWidget, ok := bs.filenameWidget.GetWidget().(*gotui_widgets.List)
+	if !ok || filenameListWidget == nil {
+		return fmt.Errorf("filename list widget extraction failed")
+	}
+
+	detailsGotUI, ok := bs.detailsWidget.GetWidget().(*gotui_widgets.Paragraph)
+	if !ok || detailsGotUI == nil {
+		return fmt.Errorf("details widget extraction failed")
+	}
+
+	statusGotUI, ok := statusWidget.GetWidget().(*gotui_widgets.Paragraph)
+	if !ok || statusGotUI == nil {
+		return fmt.Errorf("status widget extraction failed")
+	}
+
+	// 3. Configure widget rectangles
+	hashListWidget.SetRect(listX, listY, listW, listH)
+	filenameListWidget.SetRect(listX, listY, listW, listH)
+	detailsGotUI.SetRect(detailsX, detailsY, detailsW, detailsH)
+	statusGotUI.SetRect(statusX, statusY, statusW, statusH)
+
+	// 4. Set up Grid with widgets
+	root.Set(
+		gotui.NewRow(float64(listH),
+			gotui.NewCol(40, hashListWidget),
+			gotui.NewCol(60, detailsGotUI),
+		),
+		gotui.NewRow(float64(statusH),
+			gotui.NewCol(100, statusGotUI),
+		),
+	)
+
+	// 5. Set root widget on app
+	gtApp.SetRoot(root, true)
+
+	// 6. Store app reference for event handling
+	bs.app = gtApp
+
+	// 7. Run event loop (blocks until user quits)
+	return gtApp.Run()
 }
 
 // CreateKeyBindings creates the event handler with all keyboard bindings

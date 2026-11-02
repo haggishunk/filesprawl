@@ -9,6 +9,7 @@ import (
 	"github.com/haggishunk/filesprawl/internal/consolidation/ui/screens"
 	"github.com/haggishunk/filesprawl/internal/consolidation/ui/widgets"
 	"github.com/haggishunk/filesprawl/internal/consolidation/users"
+	"github.com/metaspartan/gotui/v5"
 )
 
 // ConsolidationApp orchestrates the interactive consolidation workflow
@@ -98,10 +99,11 @@ func (ca *ConsolidationApp) runBrowsingUI() error {
 		return fmt.Errorf("app not fully initialized for browsing")
 	}
 
-	// TODO: Phase 5 gotui - Create real gotui app instance
-	// For now, use a placeholder/stub app object for console-based testing
-	// Real gotui integration will create: app := gotui.NewTerminalApp()
-	var app interface{} = struct{}{}  // Non-nil placeholder
+	// Phase 5: Create real gotui app instance
+	app := gotui.NewApp()
+	if app == nil {
+		return fmt.Errorf("failed to create gotui app instance")
+	}
 
 	// Create BrowsingScreen
 	browsingScreen := screens.NewBrowsingScreen(
