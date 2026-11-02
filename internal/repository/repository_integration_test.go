@@ -14,12 +14,12 @@ import (
 )
 
 // openTestDB returns a real *pgxpool.Pool for integration tests.
-// The test is skipped when DATABASE_URL is not set.
+// The test is skipped when FILESPRAWL_DATABASE_URL is not set.
 func openTestDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	url := os.Getenv("DATABASE_URL")
+	url := os.Getenv("FILESPRAWL_DATABASE_URL")
 	if url == "" {
-		t.Skip("DATABASE_URL not set; skipping integration test")
+		t.Skip("FILESPRAWL_DATABASE_URL not set; skipping integration test")
 	}
 	pool, err := pgxpool.New(context.Background(), url)
 	if err != nil {

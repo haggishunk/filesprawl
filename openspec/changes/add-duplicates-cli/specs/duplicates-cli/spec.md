@@ -99,9 +99,9 @@ The system SHALL use human-readable output format for duplicate reports.
 ### Requirement: Database Connection
 The system SHALL require database connectivity for duplicate detection.
 
-#### Scenario: DATABASE_URL required
-- **WHEN** running `duplicates` command without DATABASE_URL environment variable
-- **THEN** return error "DATABASE_URL is required"
+#### Scenario: FILESPRAWL_DATABASE_URL required
+- **WHEN** running `duplicates` command without FILESPRAWL_DATABASE_URL environment variable
+- **THEN** return error "FILESPRAWL_DATABASE_URL is required"
 
 #### Scenario: Database connection failure
 - **WHEN** database connection fails

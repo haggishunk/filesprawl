@@ -15,13 +15,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// OpenRepository reads DATABASE_URL from the environment, opens a pgx pool,
+// OpenRepository reads FILESPRAWL_DATABASE_URL from the environment, opens a pgx pool,
 // and returns an ObjectRepository together with a cleanup function the caller
 // must invoke when the repository is no longer needed.
 func OpenRepository(ctx context.Context) (*repository.ObjectRepository, func(), error) {
-	databaseURL := os.Getenv("DATABASE_URL")
+	databaseURL := os.Getenv("FILESPRAWL_DATABASE_URL")
 	if databaseURL == "" {
-		return nil, nil, fmt.Errorf("DATABASE_URL is required")
+		return nil, nil, fmt.Errorf("FILESPRAWL_DATABASE_URL is required")
 	}
 
 	config, err := pgxpool.ParseConfig(databaseURL)

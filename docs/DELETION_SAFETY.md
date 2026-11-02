@@ -8,7 +8,7 @@ Before deleting a directory from your storage locations, you need to verify that
 
 ```bash
 # Check a specific directory pattern
-psql $DATABASE_URL -v "dir_pattern='%travis-transfer/2019/03/10/%'" \
+psql $FILESPRAWL_DATABASE_URL -v "dir_pattern='%travis-transfer/2019/03/10/%'" \
   -f db/scripts/check_directory_deletion_safety.sql
 ```
 
@@ -54,14 +54,14 @@ Checking directory pattern: %travis-transfer/2019/03/10/%
 ### Cleaning up incomplete transfer directories
 ```bash
 # Check xforants/light/travis-transfer/
-psql $DATABASE_URL -v "dir_pattern='%travis-transfer%'" \
+psql $FILESPRAWL_DATABASE_URL -v "dir_pattern='%travis-transfer%'" \
   -f db/scripts/check_directory_deletion_safety.sql
 ```
 
 ### Verifying before archiving to backup
 ```bash
 # Check local old backups
-psql $DATABASE_URL -v "dir_pattern='%old-backup%'" \
+psql $FILESPRAWL_DATABASE_URL -v "dir_pattern='%old-backup%'" \
   -f db/scripts/check_directory_deletion_safety.sql
 ```
 

@@ -20,7 +20,7 @@
   - `openspec validate add-index-command --strict` passed
 - Smoke-tested remote access for `dbox-haggishunk-at-hotmail` and confirmed `code` is a valid path.
 - Attempted live indexing, but local DB access from host was blocked:
-  - `DATABASE_URL` was initially unset
+  - `FILESPRAWL_DATABASE_URL` was initially unset
   - Compose Postgres started, but host port publishing failed due to Docker/iptables DNAT issues
   - workaround DB container over bridge IP was prepared, but the final readiness/index step was cancelled by the user
 

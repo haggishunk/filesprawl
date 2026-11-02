@@ -54,7 +54,7 @@ Filesprawl is a file indexing and deduplication system for managing files across
 - **Test Coverage**: Unit tests for individual packages (currently minimal/scaffolded)
 - **Database Testing**: Uses `database.Database` interface for mocking in unit tests
 - **Integration Testing**: Docker Compose provides PostgreSQL for integration tests;
-  integration tests are skipped when `DATABASE_URL` is not set
+  integration tests are skipped when `FILESPRAWL_DATABASE_URL` is not set
 
 ### Git Workflow
 - **Repository**: github.com/haggishunk/filesprawl
@@ -90,7 +90,7 @@ Filesprawl is a file indexing and deduplication system for managing files across
 - **rclone Dependency**: Requires rclone RC server running (`rclone rcd --rc-serve --rc-no-auth`)
 - **Database**: PostgreSQL required (currently no support for other databases)
 - **Go Version**: Requires Go 1.21.3 or compatible
-- **Environment Variables**: `DATABASE_URL` must be set for database connection
+- **Environment Variables**: `FILESPRAWL_DATABASE_URL` must be set for database connection
 
 ### Development Constraints
 - **Docker Compose**: Development database runs in Docker

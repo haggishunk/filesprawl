@@ -16,7 +16,7 @@ example workflow for remote indexing:
 
 `list-remotes` prints the local rclone remote names as configured. `index --remote` accepts either `media` or `media:` and normalizes that name before persisting it.
 
-All indexing commands require `DATABASE_URL` to be set so scan results can be persisted with the local host name and the selected remote name.
+All indexing commands require `FILESPRAWL_DATABASE_URL` to be set so scan results can be persisted with the local host name and the selected remote name.
 
 ### Local File Indexing
 

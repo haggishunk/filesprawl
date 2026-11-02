@@ -11,7 +11,7 @@ Before deleting or consolidating any files, run these three checks in order:
 
 **Check**: Verify all variants are preserved before consolidating by filename
 ```bash
-psql $DATABASE_URL -f db/scripts/detect_name_collisions.sql
+psql $FILESPRAWL_DATABASE_URL -f db/scripts/detect_name_collisions.sql
 ```
 
 **Result Interpretation**:
@@ -28,7 +28,7 @@ psql $DATABASE_URL -f db/scripts/detect_name_collisions.sql
 
 **Check**: Verify all files in a directory exist elsewhere before deletion
 ```bash
-psql $DATABASE_URL -v "dir_pattern='%target/dir/%'" \
+psql $FILESPRAWL_DATABASE_URL -v "dir_pattern='%target/dir/%'" \
   -f db/scripts/check_directory_deletion_safety.sql
 ```
 
@@ -63,7 +63,7 @@ HAVING COUNT(*) > 1;
 ### Step 1: Analyze
 ```bash
 # Check for name collisions
-psql $DATABASE_URL -f db/scripts/detect_name_collisions.sql
+psql $FILESPRAWL_DATABASE_URL -f db/scripts/detect_name_collisions.sql
 
 # Identify target directory
 cd /path/to/consolidate
@@ -72,7 +72,7 @@ cd /path/to/consolidate
 ### Step 2: Verify Safety
 ```bash
 # Check if all files exist elsewhere
-psql $DATABASE_URL -v "dir_pattern='%/path/to/consolidate/%'" \
+psql $FILESPRAWL_DATABASE_URL -v "dir_pattern='%/path/to/consolidate/%'" \
   -f db/scripts/check_directory_deletion_safety.sql
 ```
 

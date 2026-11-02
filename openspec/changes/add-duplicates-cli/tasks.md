@@ -26,7 +26,7 @@
 - [x] 3.6 Return clear error messages for invalid inputs — All validation functions provide descriptive errors
 
 ## 4. Error Handling
-- [x] 4.1 Handle missing DATABASE_URL with clear error message — cli.OpenRepository() handles this
+- [x] 4.1 Handle missing FILESPRAWL_DATABASE_URL with clear error message — cli.OpenRepository() handles this
 - [x] 4.2 Handle database connection failures with context — Lines 84-88 with defer cleanup
 - [x] 4.3 Handle repository query errors with wrapped context — Lines 101-110
 - [x] 4.4 Handle missing mode selection (neither --remote nor --across-remotes) — Lines 57-58
@@ -40,7 +40,7 @@
 - [x] 5.5 Write integration test for across-remotes duplicates command — TestFindAcrossRemotes_ReturnsDuplicateGroups
 - [x] 5.6 Write integration test with filtering options — TestFindAcrossRemotes_MinSizeFiltersSmallFiles
 - [x] 5.7 Write integration test for "no duplicates found" case — TestFindAcrossRemotes_NoDuplicates, TestFormatReport_Empty
-- [x] 5.8 Test error paths (missing DATABASE_URL, invalid remote, etc.) — TestFindAcrossRemotes_RepoError
+- [x] 5.8 Test error paths (missing FILESPRAWL_DATABASE_URL, invalid remote, etc.) — TestFindAcrossRemotes_RepoError
 
 ## 6. Documentation
 - [x] 6.1 Update README.md with duplicates command examples — README.md lines 19-55

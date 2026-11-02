@@ -268,9 +268,9 @@ import (
 // OpenRepository opens a database connection and returns an ObjectRepository.
 // The caller must call the cleanup function when done.
 func OpenRepository(ctx context.Context) (*repository.ObjectRepository, func(), error) {
-	databaseURL := os.Getenv("DATABASE_URL")
+	databaseURL := os.Getenv("FILESPRAWL_DATABASE_URL")
 	if databaseURL == "" {
-		return nil, nil, fmt.Errorf("DATABASE_URL environment variable is required")
+		return nil, nil, fmt.Errorf("FILESPRAWL_DATABASE_URL environment variable is required")
 	}
 
 	config, err := pgxpool.ParseConfig(databaseURL)

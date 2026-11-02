@@ -33,7 +33,7 @@ Only 1 variant preserved → Data loss!
 
 ```bash
 # Detect all filename collisions
-psql $DATABASE_URL -f db/scripts/detect_name_collisions.sql
+psql $FILESPRAWL_DATABASE_URL -f db/scripts/detect_name_collisions.sql
 ```
 
 ## Interpreting Results
