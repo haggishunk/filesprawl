@@ -12,6 +12,7 @@ import (
 	"github.com/haggishunk/filesprawl/internal/consolidation/ui"
 	"github.com/haggishunk/filesprawl/internal/consolidation/users"
 	"github.com/haggishunk/filesprawl/internal/repository"
+	"github.com/haggishunk/filesprawl/internal/rclone"
 	"github.com/spf13/cobra"
 )
 
@@ -140,8 +141,22 @@ func runConsolidateReview(ctx context.Context, repo interface{}) error {
 	// Convert analysis duplicates to browsing duplicates
 	browsingGroups := adapter.ToGroupsForBrowsing(duplicateGroups)
 
-	// Create and run consolidation app
-	app, err := ui.NewConsolidationApp(ctx, userRepo, flagRepo)
+	// Get list of remotes from rclone RC server
+	var remoteNames []string
+	remoteResp, err := rclone.ListRemotes(ctx)
+	if err != nil {
+		// Don't fail if we can't get remotes, just use empty list
+		fmt.Printf("Warning: Could not list remotes: %v\n", err)
+		remoteNames = []string{}
+	} else if remoteResp != nil {
+		remoteNames = remoteResp.Remotes
+	}
+
+	// Determine if in review mode
+	inReviewMode := consolidateReview || consolidateReviewAll
+
+	// Create and run consolidation app with version and settings
+	app, err := ui.NewConsolidationApp(ctx, userRepo, flagRepo, version, inReviewMode, remoteNames)
 	if err != nil {
 		return fmt.Errorf("failed to create consolidation app: %w", err)
 	}

@@ -19,10 +19,14 @@ type BrowsingScreen struct {
 	hashWidget     *widgets.HashCentricWidget
 	filenameWidget *widgets.FilenameCentricWidget
 	detailsWidget  *widgets.DetailsWidget
+	bannerWidget   *widgets.BannerWidget
 	currentWidget  widgets.BrowsingWidget // pointer to current active widget
 	isHashView     bool                    // true for hash, false for filename
 	ctx            context.Context
 	app            *gotui.Application     // reference to gotui app for event handling
+	version        string                 // application version
+	reviewMode     bool                   // true if in review mode
+	remotes        []string               // list of configured remotes
 }
 
 // NewBrowsingScreen creates a new browsing screen
@@ -32,15 +36,33 @@ func NewBrowsingScreen(
 	hashWidget *widgets.HashCentricWidget,
 	filenameWidget *widgets.FilenameCentricWidget,
 	detailsWidget *widgets.DetailsWidget,
+	version string,
+	reviewMode bool,
+	remotes []string,
 ) *BrowsingScreen {
+	// Create banner with initial info
+	bannerInfo := &widgets.BannerInfo{
+		Version:       version,
+		ReviewMode:    reviewMode,
+		ExecuteMode:   !reviewMode,
+		Remotes:       remotes,
+		TotalDuplicates: 0,
+		FlaggedCount:  0,
+	}
+	bannerWidget := widgets.NewBannerWidget(bannerInfo)
+
 	return &BrowsingScreen{
 		sessionManager: sessionManager,
 		flagManager:    flagManager,
 		hashWidget:     hashWidget,
 		filenameWidget: filenameWidget,
 		detailsWidget:  detailsWidget,
+		bannerWidget:   bannerWidget,
 		isHashView:     true, // Start with hash view
 		currentWidget:  hashWidget,
+		version:        version,
+		reviewMode:     reviewMode,
+		remotes:        remotes,
 	}
 }
 
@@ -70,10 +92,11 @@ func (bs *BrowsingScreen) Show(ctx context.Context, app interface{}) error {
 		return fmt.Errorf("terminal too small: %dx%d (minimum 80x24)", termWidth, termHeight)
 	}
 
-	// Create layout manager for 3-pane layout
+	// Create layout manager for 3-pane layout with banner
 	layout := widgets.NewLayoutManager(termWidth, termHeight)
 
 	// Get widget rectangles
+	bannerX, bannerY, bannerW, bannerH := layout.GetBannerRect()
 	listX, listY, listW, listH := layout.GetListPaneRect()
 	detailsX, detailsY, detailsW, detailsH := layout.GetDetailsPaneRect()
 	statusX, statusY, statusW, statusH := layout.GetStatusBarRect()
@@ -93,10 +116,14 @@ func (bs *BrowsingScreen) Show(ctx context.Context, app interface{}) error {
 	}
 	statusWidget.SetRect(statusX, statusY, statusW, statusH)
 
+	// Configure banner widget position
+	bs.bannerWidget.SetRect(bannerX, bannerY, bannerW, bannerH)
+
 	// Display layout information (Phase 5: gotui will render this)
 	fmt.Println("═══════════════════════════════════════════════════════════════")
-	fmt.Println("BrowsingScreen: 3-pane TUI layout initialized")
+	fmt.Println("BrowsingScreen: 4-pane TUI layout with banner initialized")
 	fmt.Println("═══════════════════════════════════════════════════════════════")
+	fmt.Println(fmt.Sprintf("Banner (info):              (%d,%d) %dx%d", bannerX, bannerY, bannerW, bannerH))
 	fmt.Println(fmt.Sprintf("List pane (hash/filename):  (%d,%d) %dx%d", listX, listY, listW, listH))
 	fmt.Println(fmt.Sprintf("Details pane (file info):   (%d,%d) %dx%d", detailsX, detailsY, detailsW, detailsH))
 	fmt.Println(fmt.Sprintf("Status bar (controls):      (%d,%d) %dx%d", statusX, statusY, statusW, statusH))
@@ -141,6 +168,11 @@ func (bs *BrowsingScreen) Show(ctx context.Context, app interface{}) error {
 		return fmt.Errorf("status widget extraction failed")
 	}
 
+	bannerGotUI, ok := bs.bannerWidget.GetWidget().(*gotui_widgets.Paragraph)
+	if !ok || bannerGotUI == nil {
+		return fmt.Errorf("banner widget extraction failed")
+	}
+
 	// 3. Wrap list widgets with event dispatcher to intercept keyboard events
 	// The wrapper routes all keyboard events to BrowsingScreen action handlers
 	wrappedListWidget := &EventDispatchWrapper{
@@ -154,8 +186,11 @@ func (bs *BrowsingScreen) Show(ctx context.Context, app interface{}) error {
 	detailsGotUI.SetRect(detailsX, detailsY, detailsW, detailsH)
 	statusGotUI.SetRect(statusX, statusY, statusW, statusH)
 
-	// 5. Set up Grid with wrapped list widget for event handling
+	// 5. Set up Grid with banner, list, details, and status widgets
 	root.Set(
+		gotui.NewRow(float64(bannerH),
+			gotui.NewCol(100, bannerGotUI),
+		),
 		gotui.NewRow(float64(listH),
 			gotui.NewCol(40, wrappedListWidget),
 			gotui.NewCol(60, detailsGotUI),
@@ -186,13 +221,14 @@ func (bs *BrowsingScreen) CreateKeyBindings() error {
 
 	handlers := map[rune]string{
 		'j': "Scroll Down",
-		'k': "Scroll Up / Keep",
-		'v': "View Switch",
-		'a': "Archive",
-		'd': "Delete",
-		's': "Skip",
-		'q': "Quit",
-		'K': "Keep (alias)",
+		'k': "Scroll Up",
+		'K': "Keep (all copies)",
+		'v': "View Switch (hash ↔ filename)",
+		'a': "Archive (backup copies)",
+		'd': "Delete (remove duplicates)",
+		's': "Skip (clear flags)",
+		'?': "Help (keyboard reference)",
+		'q': "Quit (review summary)",
 	}
 
 	fmt.Println()
@@ -230,6 +266,8 @@ func (bs *BrowsingScreen) handleKeypress(key rune, app interface{}) {
 		_ = bs.handleDelete()
 	case 's', 'S': // Skip
 		_ = bs.handleSkip()
+	case '?': // Help
+		_ = bs.handleHelp()
 	case 'q', 'Q': // Quit
 		_ = bs.handleQuit(app)
 	}
@@ -436,6 +474,11 @@ func (bs *BrowsingScreen) handleSkip() error {
 	}
 
 	return nil
+}
+
+// handleHelp displays the help screen
+func (bs *BrowsingScreen) handleHelp() error {
+	return modals.ShowHelpModal()
 }
 
 // handleQuit saves and exits

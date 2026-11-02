@@ -5,6 +5,7 @@ type LayoutManager struct {
 	maxX         int
 	maxY         int
 	leftPaneW    int  // ~40% for list
+	bannerH      int  // 1 line for banner
 	statusH      int  // 3 lines for status
 	dividerX     int  // right border of left pane
 	detailsPaneX int  // start of right pane
@@ -21,7 +22,8 @@ func NewLayoutManager(maxX, maxY int) *LayoutManager {
 		maxX:     maxX,
 		maxY:     maxY,
 		leftPaneW: maxX * 40 / 100, // 40% width
-		statusH:   3,               // Status bar height
+		bannerH:  1,                // Banner takes 1 line
+		statusH:  3,                // Status bar height
 	}
 
 	// Adjust for odd terminal widths
@@ -38,18 +40,24 @@ func NewLayoutManager(maxX, maxY int) *LayoutManager {
 	return lm
 }
 
+// GetBannerRect returns coordinates for banner (top of screen)
+// Format: (x, y, width, height)
+func (lm *LayoutManager) GetBannerRect() (int, int, int, int) {
+	return 0, 0, lm.maxX, lm.bannerH
+}
+
 // GetListPaneRect returns coordinates for left pane (list widget)
 // Format: (x, y, width, height)
 func (lm *LayoutManager) GetListPaneRect() (int, int, int, int) {
-	contentH := lm.maxY - lm.statusH - 1
-	return 0, 0, lm.leftPaneW, contentH
+	contentH := lm.maxY - lm.bannerH - lm.statusH - 1
+	return 0, lm.bannerH, lm.leftPaneW, contentH
 }
 
 // GetDetailsPaneRect returns coordinates for right pane (details widget)
 func (lm *LayoutManager) GetDetailsPaneRect() (int, int, int, int) {
-	contentH := lm.maxY - lm.statusH - 1
+	contentH := lm.maxY - lm.bannerH - lm.statusH - 1
 	detailsW := lm.maxX - lm.detailsPaneX
-	return lm.detailsPaneX, 0, detailsW, contentH
+	return lm.detailsPaneX, lm.bannerH, detailsW, contentH
 }
 
 // GetStatusBarRect returns coordinates for status bar

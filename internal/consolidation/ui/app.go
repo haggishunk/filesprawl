@@ -24,10 +24,13 @@ type ConsolidationApp struct {
 	hashWidget     *widgets.HashCentricWidget
 	filenameWidget *widgets.FilenameCentricWidget
 	isDualView     bool // true for hash, false for filename
+	version        string
+	reviewMode     bool
+	remotes        []string
 }
 
 // NewConsolidationApp creates a new consolidation app
-func NewConsolidationApp(ctx context.Context, userRepo users.Repository, flagRepo flags.Repository) (*ConsolidationApp, error) {
+func NewConsolidationApp(ctx context.Context, userRepo users.Repository, flagRepo flags.Repository, version string, reviewMode bool, remotes []string) (*ConsolidationApp, error) {
 	return &ConsolidationApp{
 		ctx:            ctx,
 		userRepo:       userRepo,
@@ -35,6 +38,9 @@ func NewConsolidationApp(ctx context.Context, userRepo users.Repository, flagRep
 		hashWidget:     widgets.NewHashCentricWidget(),
 		filenameWidget: widgets.NewFilenameCentricWidget(),
 		isDualView:     true,
+		version:        version,
+		reviewMode:     reviewMode,
+		remotes:        remotes,
 	}, nil
 }
 
@@ -105,13 +111,16 @@ func (ca *ConsolidationApp) runBrowsingUI() error {
 		return fmt.Errorf("failed to create gotui app instance")
 	}
 
-	// Create BrowsingScreen
+	// Create BrowsingScreen with version and settings
 	browsingScreen := screens.NewBrowsingScreen(
 		ca.sessionManager,
 		ca.flagManager,
 		ca.hashWidget,
 		ca.filenameWidget,
 		widgets.NewDetailsWidget(),
+		ca.version,
+		ca.reviewMode,
+		ca.remotes,
 	)
 
 	if browsingScreen == nil {

@@ -10,13 +10,13 @@ import (
 // TestConsolidationAppInitialization verifies app creation and initialization
 func TestConsolidationAppInitialization(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Create with nil repositories (testing structure, not DB ops)
-	app, err := NewConsolidationApp(ctx, nil, nil)
+	app, err := NewConsolidationApp(ctx, nil, nil, "dev", true, []string{})
 	if err != nil {
 		t.Fatalf("failed to create app: %v", err)
 	}
-	
+
 	if app == nil {
 		t.Fatal("expected non-nil app")
 	}
@@ -28,7 +28,7 @@ func TestConsolidationAppInitialization(t *testing.T) {
 // TestConsolidationAppWithDuplicateGroups tests app with sample data
 func TestConsolidationAppWithSampleGroups(t *testing.T) {
 	ctx := context.Background()
-	app, err := NewConsolidationApp(ctx, nil, nil)
+	app, err := NewConsolidationApp(ctx, nil, nil, "dev", true, []string{})
 	if err != nil {
 		t.Fatalf("failed to create app: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestConsolidationAppWithSampleGroups(t *testing.T) {
 // TestAppContextPropagation verifies context is preserved
 func TestAppContextPropagation(t *testing.T) {
 	ctx := context.Background()
-	app, err := NewConsolidationApp(ctx, nil, nil)
+	app, err := NewConsolidationApp(ctx, nil, nil, "dev", true, []string{})
 	if err != nil {
 		t.Fatalf("failed to create app: %v", err)
 	}
