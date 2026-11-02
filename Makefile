@@ -26,5 +26,8 @@ LDFLAGS := -s -w -X main.version=$(GO_VERSION)
 build:
 	go build -ldflags '$(LDFLAGS)' -o build/filesprawl ./cmd/filesprawl
 
+clean:
+	rm build/*
+
 install:
 	go install -ldflags '$(LDFLAGS)' ./cmd/filesprawl
