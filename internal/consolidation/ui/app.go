@@ -4,16 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/haggishunk/filesprawl/internal/consolidation/browsing"
 	"github.com/haggishunk/filesprawl/internal/consolidation/flags"
 	"github.com/haggishunk/filesprawl/internal/consolidation/ui/screens"
-	"github.com/haggishunk/filesprawl/internal/consolidation/ui/widgets"
 	"github.com/haggishunk/filesprawl/internal/consolidation/users"
-	"github.com/metaspartan/gotui/v5"
 )
 
 // ConsolidationApp orchestrates the interactive consolidation workflow
-// NOTE: Phase 5 TUI integration pending. Stub implementation for now.
 type ConsolidationApp struct {
 	ctx            context.Context
 	userRepo       users.Repository
@@ -21,9 +19,6 @@ type ConsolidationApp struct {
 	currentUser    *users.User
 	sessionManager *browsing.SessionManager
 	flagManager    *browsing.PersistentFlagManager
-	hashWidget     *widgets.HashCentricWidget
-	filenameWidget *widgets.FilenameCentricWidget
-	isDualView     bool // true for hash, false for filename
 	version        string
 	reviewMode     bool
 	remotes        []string
@@ -32,15 +27,12 @@ type ConsolidationApp struct {
 // NewConsolidationApp creates a new consolidation app
 func NewConsolidationApp(ctx context.Context, userRepo users.Repository, flagRepo flags.Repository, version string, reviewMode bool, remotes []string) (*ConsolidationApp, error) {
 	return &ConsolidationApp{
-		ctx:            ctx,
-		userRepo:       userRepo,
-		flagRepo:       flagRepo,
-		hashWidget:     widgets.NewHashCentricWidget(),
-		filenameWidget: widgets.NewFilenameCentricWidget(),
-		isDualView:     true,
-		version:        version,
-		reviewMode:     reviewMode,
-		remotes:        remotes,
+		ctx:        ctx,
+		userRepo:   userRepo,
+		flagRepo:   flagRepo,
+		version:    version,
+		reviewMode: reviewMode,
+		remotes:    remotes,
 	}, nil
 }
 
@@ -76,14 +68,11 @@ func (ca *ConsolidationApp) Run(duplicateGroups []browsing.DuplicateGroup) error
 	}
 
 	// Load duplicates
+	fmt.Printf("🔍 Loading %d duplicate group(s) into session\n", len(duplicateGroups))
 	ca.sessionManager.LoadDuplicates(duplicateGroups)
 
-	// Update widgets
-	ca.hashWidget.UpdateData(duplicateGroups)
-	ca.filenameWidget.UpdateData(duplicateGroups)
-
-	// Step 4: Interactive browsing
-	if err := ca.runBrowsingUI(); err != nil {
+	// Step 4: Interactive browsing with Bubble Tea
+	if err := ca.runBrowsingUI(duplicateGroups); err != nil {
 		return fmt.Errorf("browsing failed: %w", err)
 	}
 
@@ -99,39 +88,15 @@ func (ca *ConsolidationApp) Run(duplicateGroups []browsing.DuplicateGroup) error
 	return nil
 }
 
-// runBrowsingUI runs the interactive browsing interface
-func (ca *ConsolidationApp) runBrowsingUI() error {
+// runBrowsingUI runs the interactive browsing interface using Bubble Tea
+func (ca *ConsolidationApp) runBrowsingUI(duplicateGroups []browsing.DuplicateGroup) error {
 	if ca.ctx == nil || ca.sessionManager == nil || ca.flagManager == nil {
 		return fmt.Errorf("app not fully initialized for browsing")
 	}
 
-	// Phase 5: Create real gotui app instance
-	app := gotui.NewApp()
-	if app == nil {
-		return fmt.Errorf("failed to create gotui app instance")
-	}
-
-	// Create BrowsingScreen with version and settings
-	browsingScreen := screens.NewBrowsingScreen(
-		ca.sessionManager,
-		ca.flagManager,
-		ca.hashWidget,
-		ca.filenameWidget,
-		widgets.NewDetailsWidget(),
-		ca.version,
-		ca.reviewMode,
-		ca.remotes,
-	)
-
-	if browsingScreen == nil {
-		return fmt.Errorf("failed to create browsing screen")
-	}
-
-	// Run interactive browsing
-	// In Phase 5 gotui, this will render real TUI and block until user quits
-	// For now, this returns immediately after showing status
-	if err := browsingScreen.Show(ca.ctx, app); err != nil {
-		return fmt.Errorf("browsing screen failed: %w", err)
+	// Run Bubble Tea TUI
+	if err := ca.runBubbleTeaTUI(duplicateGroups); err != nil {
+		return fmt.Errorf("TUI failed: %w", err)
 	}
 
 	// After browsing, show summary and ask for final confirmation
@@ -150,37 +115,23 @@ func (ca *ConsolidationApp) runBrowsingUI() error {
 	return nil
 }
 
-// HandleViewSwitch switches between hash and filename views
-func (ca *ConsolidationApp) HandleViewSwitch() {
-	ca.isDualView = !ca.isDualView
-}
+// runBubbleTeaTUI runs the Bubble Tea TUI
+func (ca *ConsolidationApp) runBubbleTeaTUI(duplicateGroups []browsing.DuplicateGroup) error {
+	// Create the Bubble Tea model
+	model := NewConsolidationModel(
+		ca.ctx,
+		ca.sessionManager,
+		ca.flagManager,
+		duplicateGroups,
+		ca.version,
+		ca.reviewMode,
+		ca.remotes,
+	)
 
-// GetCurrentWidget returns the currently active widget
-func (ca *ConsolidationApp) GetCurrentWidget() widgets.BrowsingWidget {
-	if ca.isDualView {
-		return ca.hashWidget
-	}
-	return ca.filenameWidget
-}
-
-// FlagCurrentItem flags the currently selected item
-func (ca *ConsolidationApp) FlagCurrentItem(flagType flags.FlagType, reason *string, archiveDest *string) error {
-	widget := ca.GetCurrentWidget()
-	selectedIdx := widget.GetSelectedIndex()
-
-	switch flagType {
-	case flags.FlagTypeKeep:
-		return ca.flagManager.PersistKeep(ca.ctx, selectedIdx)
-	case flags.FlagTypeArchive:
-		if archiveDest == nil || *archiveDest == "" {
-			return fmt.Errorf("archive destination required")
-		}
-		return ca.flagManager.PersistArchive(ca.ctx, selectedIdx, *archiveDest, reason)
-	case flags.FlagTypeDelete:
-		return ca.flagManager.PersistDelete(ca.ctx, selectedIdx, reason)
-	default:
-		return fmt.Errorf("unknown flag type: %v", flagType)
-	}
+	// Run the TUI
+	program := tea.NewProgram(model, tea.WithAltScreen())
+	_, err := program.Run()
+	return err
 }
 
 // GetSessionSummary returns a summary of flagged decisions
