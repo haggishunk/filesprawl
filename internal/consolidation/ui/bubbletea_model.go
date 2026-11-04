@@ -287,29 +287,38 @@ func (m *ConsolidationModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.tablePane.SelectionUp()
 			}
 		}
-	case "v":
+	case "w":
 		// Toggle wide view in table pane (only works when table is focused)
 		if m.focusedPane == "table" && m.tablePane != nil {
 			m.tablePane.ToggleWideView()
 		}
+	case "v":
+		// Open file for preview (only in table pane)
+		if m.focusedPane == "table" && m.tablePane != nil {
+			selectedFile := m.tablePane.GetSelectedFile()
+			if selectedFile != nil && selectedFile.FileInfo != nil {
+				// TODO: Open file with system viewer (e.g., less, vim, etc.)
+				m.lastError = fmt.Sprintf("Preview: %s", selectedFile.FileInfo.Path)
+			}
+		}
 	case "K":
-		// Flag as KEEP (only in table panes)
-		if m.focusedPane == "hash_table" || m.focusedPane == "filename_table" {
+		// Flag as KEEP (only in table pane)
+		if m.focusedPane == "table" && m.tablePane != nil {
 			m.handleAction("keep")
 		}
 	case "a":
-		// Flag as ARCHIVE (only in table panes)
-		if m.focusedPane == "hash_table" || m.focusedPane == "filename_table" {
+		// Flag as ARCHIVE (only in table pane)
+		if m.focusedPane == "table" && m.tablePane != nil {
 			m.handleAction("archive")
 		}
 	case "d":
-		// Flag as DELETE (only in table panes)
-		if m.focusedPane == "hash_table" || m.focusedPane == "filename_table" {
+		// Flag as DELETE (only in table pane)
+		if m.focusedPane == "table" && m.tablePane != nil {
 			m.handleAction("delete")
 		}
 	case "s":
-		// Flag as SKIP (only in table panes)
-		if m.focusedPane == "hash_table" || m.focusedPane == "filename_table" {
+		// Flag as SKIP (only in table pane)
+		if m.focusedPane == "table" && m.tablePane != nil {
 			m.handleAction("skip")
 		}
 	case "?":
@@ -352,46 +361,58 @@ func (m *ConsolidationModel) handleAction(action string) {
 	}
 
 	// Get the currently selected file
-	version := m.tablePane.GetSelectedVersion()
+	version := m.tablePane.GetSelectedFile()
 	if version == nil {
+		m.lastError = "No file selected"
 		return
 	}
 
 	switch action {
 	case "keep":
+		m.lastError = "" // Clear previous error
 		if err := m.flagManager.PersistKeep(m.ctx, version.FileID); err != nil {
-			fmt.Printf("Error flagging as KEEP: %v\n", err)
+			m.lastError = fmt.Sprintf("❌ Keep failed: %v", err)
+		} else {
+			m.lastError = "✓ Flagged as KEEP"
 		}
 	case "archive":
 		// TODO: Show modal to get archive destination
+		m.lastError = ""         // Clear previous error
 		destination := "archive" // Placeholder
 		reason := "User flagged via TUI"
 		if err := m.flagManager.PersistArchive(m.ctx, version.FileID, destination, &reason); err != nil {
-			fmt.Printf("Error flagging as ARCHIVE: %v\n", err)
+			m.lastError = fmt.Sprintf("❌ Archive failed: %v", err)
+		} else {
+			m.lastError = "✓ Flagged as ARCHIVE"
 		}
 	case "delete":
+		m.lastError = "" // Clear previous error
 		// Check deletion safety
 		selectedGroup := m.listPane.GetSelectedGroup()
 		if selectedGroup == nil {
-			m.lastError = "No group selected"
+			m.lastError = "❌ No group selected"
 			return
 		}
 
 		safe, reason := m.safetyChecker.CheckDeletionSafety(version, selectedGroup)
 		if !safe {
-			m.lastError = reason
+			m.lastError = fmt.Sprintf("❌ %s", reason)
 			return
 		}
 
 		// Safe to delete
 		deleteReason := "User flagged via TUI"
 		if err := m.flagManager.PersistDelete(m.ctx, version.FileID, &deleteReason); err != nil {
-			fmt.Printf("Error flagging as DELETE: %v\n", err)
+			m.lastError = fmt.Sprintf("❌ Delete failed: %v", err)
+		} else {
+			m.lastError = "✓ Flagged as DELETE"
 		}
-		m.lastError = "" // Clear error on success
 	case "skip":
+		m.lastError = "" // Clear previous error
 		if err := m.flagManager.PersistSkip(m.ctx, version.FileID); err != nil {
-			fmt.Printf("Error clearing flag: %v\n", err)
+			m.lastError = fmt.Sprintf("❌ Skip failed: %v", err)
+		} else {
+			m.lastError = "✓ Cleared flags"
 		}
 	}
 }
