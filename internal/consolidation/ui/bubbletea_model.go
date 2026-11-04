@@ -313,128 +313,41 @@ func (m *ConsolidationModel) handleScroll(direction string) {
 	}
 }
 
-// handleScroll moves selection up/down
-func (m *ConsolidationModel) handleScroll(direction string) {
-	if m.listPane != nil {
-		switch direction {
-		case "down":
-			m.listPane.SelectionDown()
-		case "up":
-			m.listPane.SelectionUp()
-		}
-		m.selectedIndex = m.listPane.GetSelectedIndex()
-	}
-}
-
 // handleAction processes user actions (K/a/d/s flags)
 func (m *ConsolidationModel) handleAction(action string) {
-	if m.flagManager == nil {
+	if m.tablePane == nil || m.flagManager == nil {
 		return
 	}
 
-	// Get the currently selected file from the focused pane
-	var version *browsing.FileVersion
-	if m.focusedPane == "hash_table" && m.hashTablePane != nil {
-		version = m.hashTablePane.GetSelectedFile()
-	} else if m.focusedPane == "filename_table" && m.filenameTablePane != nil {
-		version = m.filenameTablePane.GetSelectedFile()
-	}
-
+	// Get the currently selected file
+	version := m.tablePane.GetSelectedVersion()
 	if version == nil {
-		m.lastError = "No file selected"
 		return
 	}
 
 	switch action {
 	case "keep":
-		m.lastError = "" // Clear previous error
 		if err := m.flagManager.PersistKeep(m.ctx, version.FileID); err != nil {
-			m.lastError = fmt.Sprintf("❌ Keep failed: %v", err)
-		} else {
-			m.lastError = "✓ Flagged as KEEP"
+			fmt.Printf("Error flagging as KEEP: %v\n", err)
 		}
 	case "archive":
 		// TODO: Show modal to get archive destination
-		m.lastError = ""         // Clear previous error
 		destination := "archive" // Placeholder
 		reason := "User flagged via TUI"
 		if err := m.flagManager.PersistArchive(m.ctx, version.FileID, destination, &reason); err != nil {
-			m.lastError = fmt.Sprintf("❌ Archive failed: %v", err)
-		} else {
-			m.lastError = "✓ Flagged as ARCHIVE"
+			fmt.Printf("Error flagging as ARCHIVE: %v\n", err)
 		}
 	case "delete":
-		m.lastError = "" // Clear previous error
-		// Check deletion safety
-		selectedGroup := m.listPane.GetSelectedGroup()
-		if selectedGroup == nil {
-			m.lastError = "❌ No group selected"
-			return
-		}
-
-		safe, reason := m.safetyChecker.CheckDeletionSafety(version, selectedGroup)
-		if !safe {
-			m.lastError = fmt.Sprintf("❌ %s", reason)
-			return
-		}
-
-		// Safe to delete
-		deleteReason := "User flagged via TUI"
-		if err := m.flagManager.PersistDelete(m.ctx, version.FileID, &deleteReason); err != nil {
-			m.lastError = fmt.Sprintf("❌ Delete failed: %v", err)
-		} else {
-			m.lastError = "✓ Flagged as DELETE"
+		// TODO: Check deletion safety before allowing
+		reason := "User flagged via TUI"
+		if err := m.flagManager.PersistDelete(m.ctx, version.FileID, &reason); err != nil {
+			fmt.Printf("Error flagging as DELETE: %v\n", err)
 		}
 	case "skip":
-		m.lastError = "" // Clear previous error
 		if err := m.flagManager.PersistSkip(m.ctx, version.FileID); err != nil {
-			m.lastError = fmt.Sprintf("❌ Skip failed: %v", err)
-		} else {
-			m.lastError = "✓ Cleared flags"
+			fmt.Printf("Error clearing flag: %v\n", err)
 		}
 	}
-}
-
-// constructFilePath builds the full filepath for opening/previewing a file.
-//
-// LOCAL FILES (ScanRoot set):
-//
-//	Display: hostname | filename | /full/canonical/path
-//	Accessor: /full/canonical/path (pass directly to system viewer)
-//
-// REMOTE FILES (ScanRoot null):
-//
-// constructFilePath returns the absolute path for a file.
-// For local files: full filesystem path (e.g., "/mnt/data/photos/IMG_0587.MOV")
-// For rclone files: remote:path format (e.g., "goblet:photos/IMG_0587.MOV")
-// The absolute path is stored directly in Meta.AbsolutePath.
-func (m *ConsolidationModel) constructFilePath(version *browsing.FileVersion) string {
-	if version == nil || version.FileInfo == nil {
-		return ""
-	}
-
-	// Path now contains the full, ready-to-use path
-	// (absolute path for local files, path within remote for remote files)
-	return version.FileInfo.Path
-}
-
-// SetFilenameGroups loads filename-based duplicate groups for display
-func (m *ConsolidationModel) SetFilenameGroups(groups []browsing.DuplicateGroup) {
-	m.filenameGroups = groups
-	if len(groups) > 0 && m.filenameTablePane != nil {
-		m.filenameTablePane.SetGroup(&groups[0])
-	}
-}
-
-// ToggleFilenamePaneVisibility toggles whether the filename pane is shown
-func (m *ConsolidationModel) ToggleFilenamePaneVisibility() {
-	m.showFilenamePaneVal = !m.showFilenamePaneVal
-	// Focus cycling updates handled in navigation logic
-}
-
-// IsFilenamePaneVisible returns whether the filename pane should be displayed
-func (m *ConsolidationModel) IsFilenamePaneVisible() bool {
-	return m.showFilenamePaneVal
 }
 
 // showHelp displays help
