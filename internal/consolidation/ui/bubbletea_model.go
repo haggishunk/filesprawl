@@ -258,13 +258,41 @@ func (m *ConsolidationModel) handleScroll(direction string) {
 	}
 }
 
-// handleAction processes user actions
+// handleAction processes user actions (K/a/d/s flags)
 func (m *ConsolidationModel) handleAction(action string) {
-	if m.selectedIndex < 0 || m.selectedIndex >= len(m.duplicateGroups) {
+	if m.tablePane == nil || m.flagManager == nil {
 		return
 	}
-	// TODO: Implement action handlers
-	fmt.Printf("Action: %s on index %d\n", action, m.selectedIndex)
+
+	// Get the currently selected file
+	version := m.tablePane.GetSelectedVersion()
+	if version == nil {
+		return
+	}
+
+	switch action {
+	case "keep":
+		if err := m.flagManager.PersistKeep(m.ctx, version.FileID); err != nil {
+			fmt.Printf("Error flagging as KEEP: %v\n", err)
+		}
+	case "archive":
+		// TODO: Show modal to get archive destination
+		destination := "archive" // Placeholder
+		reason := "User flagged via TUI"
+		if err := m.flagManager.PersistArchive(m.ctx, version.FileID, destination, &reason); err != nil {
+			fmt.Printf("Error flagging as ARCHIVE: %v\n", err)
+		}
+	case "delete":
+		// TODO: Check deletion safety before allowing
+		reason := "User flagged via TUI"
+		if err := m.flagManager.PersistDelete(m.ctx, version.FileID, &reason); err != nil {
+			fmt.Printf("Error flagging as DELETE: %v\n", err)
+		}
+	case "skip":
+		if err := m.flagManager.PersistSkip(m.ctx, version.FileID); err != nil {
+			fmt.Printf("Error clearing flag: %v\n", err)
+		}
+	}
 }
 
 // showHelp displays help

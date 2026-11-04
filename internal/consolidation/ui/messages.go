@@ -24,7 +24,9 @@ type ViewSwitchMsg struct{}
 
 // ActionMsg represents a user action (keep, archive, delete, skip)
 type ActionMsg struct {
-	Action string // "keep", "archive", "delete", "skip"
+	Action  string // "keep", "archive", "delete", "skip"
+	FileID  int    // ID of the file being acted upon
+	GroupID string // ID of the group containing the file
 }
 
 // ModalShowMsg shows a modal dialog
