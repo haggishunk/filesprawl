@@ -16,7 +16,6 @@ type TablePane struct {
 	height        int
 	scrollOffset  int
 	wideView      bool // Show filepath column
-	focused       bool // Whether this pane has input focus
 	flagManager   *browsing.PersistentFlagManager
 }
 
@@ -46,22 +45,9 @@ func (tp *TablePane) SetDimensions(width, height int) {
 	tp.height = height
 }
 
-// SetFocus sets whether this pane has input focus
-func (tp *TablePane) SetFocus(focused bool) {
-	tp.focused = focused
-}
-
 // ToggleWideView toggles the filepath column
 func (tp *TablePane) ToggleWideView() {
 	tp.wideView = !tp.wideView
-}
-
-// GetSelectedFile returns the currently selected file version
-func (tp *TablePane) GetSelectedFile() *browsing.FileVersion {
-	if tp.group == nil || tp.selectedIndex < 0 || tp.selectedIndex >= len(tp.group.Versions) {
-		return nil
-	}
-	return &tp.group.Versions[tp.selectedIndex]
 }
 
 // SelectionUp moves selection up
@@ -107,13 +93,8 @@ func (tp *TablePane) Render() string {
 
 	var buf strings.Builder
 
-	// Header with focus indicator
-	headerChar := "─"
-	if tp.focused {
-		headerChar = "═"
-	}
-	header := fmt.Sprintf("┌%s FILES %s┐\n", strings.Repeat(headerChar, 1), strings.Repeat(headerChar, (tp.width-14)))
-	buf.WriteString(header)
+	// Header
+	buf.WriteString("┌─ FILES IN GROUP ─────────────────┐\n")
 
 	// Column headers
 	if tp.wideView {
@@ -121,11 +102,7 @@ func (tp *TablePane) Render() string {
 	} else {
 		buf.WriteString("│ remote | filename | size | status │\n")
 	}
-	separatorWidth := tp.width - 2
-	if separatorWidth < 5 {
-		separatorWidth = 5
-	}
-	fmt.Fprintf(&buf, "├%s┤\n", strings.Repeat("─", separatorWidth-2))
+	buf.WriteString("├──────────────────────────────────┤\n")
 
 	// Calculate available space
 	contentHeight := tp.height - 5
@@ -178,12 +155,12 @@ func (tp *TablePane) renderFileLine(buf *strings.Builder, version browsing.FileV
 		}
 	}
 
-	// Build location identifier: location name (hostname for local, remote name for rclone)
+	// Truncate fields to fit
 	remote := "?"
-	if version.LocationName != "" {
-		remote = version.LocationName
-		if len(remote) > 10 {
-			remote = remote[:10]
+	if version.FileInfo != nil && version.FileInfo.ScanRoot != "" {
+		remote = version.FileInfo.ScanRoot
+		if len(remote) > 6 {
+			remote = remote[:6]
 		}
 	}
 
@@ -195,38 +172,10 @@ func (tp *TablePane) renderFileLine(buf *strings.Builder, version browsing.FileV
 		}
 	}
 
-	// Build filepath display
-	// AbsolutePath contains the full path ready to display
-	// Local: /full/filesystem/path
-	// Remote: remote_name:path/within/remote
-	// Note: Path now stores the absolute path for local files
-	filepath := ""
-	if version.FileInfo != nil {
-		filepath = version.FileInfo.Path
-	}
-
-	// Truncate for display
-	maxFilepathLen := (tp.width * 60) / 100
-	if maxFilepathLen < 20 {
-		maxFilepathLen = 20
-	}
-	if len(filepath) > maxFilepathLen {
-		filepath = filepath[:maxFilepathLen]
-	}
-
 	size := formatSize(version.FileInfo.Size)
 
-	// Format based on wide view setting
-	var content string
-	if tp.wideView {
-		// Wide view: remote | filename | filepath | size (status always shown)
-		content = fmt.Sprintf("%s %s | %s | %s | %s",
-			prefix, remote, filename, filepath, size)
-	} else {
-		// Normal view: remote | filename | size | status
-		content = fmt.Sprintf("%s %s | %s | %s | %s",
-			prefix, remote, filename, size, flagStatus)
-	}
+	content := fmt.Sprintf("%s %s | %s | %s | %s",
+		prefix, remote, filename, size, flagStatus)
 
 	lineWidth := tp.width - 2
 	if len(content) > lineWidth {

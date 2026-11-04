@@ -64,7 +64,6 @@ type StatusBar struct {
 	keepCount    int
 	archiveCount int
 	deleteCount  int
-	focusedPane  string // "list" or "table"
 	width        int
 }
 
@@ -83,11 +82,6 @@ func (sb *StatusBar) SetDimensions(width int) {
 	sb.width = width
 }
 
-// SetFocusedPane sets which pane has focus
-func (sb *StatusBar) SetFocusedPane(pane string) {
-	sb.focusedPane = pane
-}
-
 // UpdateCounts updates the flag counts
 func (sb *StatusBar) UpdateCounts(keep, archive, del int) {
 	sb.keepCount = keep
@@ -97,13 +91,8 @@ func (sb *StatusBar) UpdateCounts(keep, archive, del int) {
 
 // Render returns the rendered status bar
 func (sb *StatusBar) Render() string {
-	// Show keyboard shortcuts based on focused pane
-	var shortcuts string
-	if sb.focusedPane == "list" {
-		shortcuts = "[LIST] j/k: nav | Tab: switch | ?: help | q: quit"
-	} else {
-		shortcuts = "[TABLE] j/k: nav | Tab: switch | w: wide | v: preview | K/a/d/s: flag | ?: help | q: quit"
-	}
+	// Show keyboard shortcuts on first line
+	shortcuts := "j/k: nav | v: view | K/a/d/s: actions | ?: help | q: quit"
 
 	// Summary on second line
 	summary := fmt.Sprintf("Flags: %d Keep | %d Archive | %d Delete",

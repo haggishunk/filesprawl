@@ -37,17 +37,10 @@ type ConsolidationModel struct {
 	duplicateGroups []browsing.DuplicateGroup
 
 	// Components
-	listPane          *components.ListPane
-	hashTablePane     *components.TablePane         // Upper right: hash-grouped files
-	filenameTablePane *components.FilenameTablePane // Lower right: filename-grouped files
-	banner            *components.Banner
-	statusBar         *components.StatusBar
-	safetyChecker     *components.SafetyChecker
-	helpModal         *components.HelpModal
-	filenameGroups    []browsing.DuplicateGroup // Filename groups for display
-
-	// UI feedback
-	lastError string // Last error message to display
+	listPane  *components.ListPane
+	tablePane *components.TablePane
+	banner    *components.Banner
+	statusBar *components.StatusBar
 }
 
 // NewConsolidationModel creates a new Bubble Tea model
@@ -61,35 +54,29 @@ func NewConsolidationModel(
 	remotes []string,
 ) *ConsolidationModel {
 	model := &ConsolidationModel{
-		ctx:                 ctx,
-		sessionManager:      sessionManager,
-		flagManager:         flagManager,
-		duplicateGroups:     duplicateGroups,
-		selectedIndex:       0,
-		isHashView:          true,
-		focusedPane:         "list", // Start with list pane focused
-		modalType:           "",
-		width:               80,
-		height:              24,
-		version:             version,
-		reviewMode:          reviewMode,
-		remotes:             remotes,
-		showFilenamePaneVal: true,                        // Show filename pane by default
-		filenameGroups:      []browsing.DuplicateGroup{}, // Will be loaded later
+		ctx:             ctx,
+		sessionManager:  sessionManager,
+		flagManager:     flagManager,
+		duplicateGroups: duplicateGroups,
+		selectedIndex:   0,
+		isHashView:      true,
+		modalType:       "",
+		width:           80,
+		height:          24,
+		version:         version,
+		reviewMode:      reviewMode,
+		remotes:         remotes,
 	}
 
 	// Initialize components
 	model.listPane = components.NewListPane(duplicateGroups, 40, 20)
-	model.hashTablePane = components.NewTablePane(60, 20, flagManager)
-	model.filenameTablePane = components.NewFilenameTablePane(60, 20, flagManager)
+	model.tablePane = components.NewTablePane(60, 20, flagManager)
 	model.banner = components.NewBanner(version, len(duplicateGroups), reviewMode, remotes, 80)
 	model.statusBar = components.NewStatusBar(80)
-	model.safetyChecker = components.NewSafetyChecker(flagManager)
-	model.helpModal = components.NewHelpModal(80, 24)
 
-	// Set initial group in hash table pane
+	// Set initial group in table
 	if len(duplicateGroups) > 0 {
-		model.hashTablePane.SetGroup(&duplicateGroups[0])
+		model.tablePane.SetGroup(&duplicateGroups[0])
 	}
 
 	return model
@@ -108,33 +95,16 @@ func (m *ConsolidationModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// Update component dimensions (40% left, 60% right split vertically)
+		// Update component dimensions (40% left, 60% right)
 		leftWidth := (m.width * 40) / 100
 		rightWidth := m.width - leftWidth - 2 // Account for borders
 		panelHeight := m.height - 4
-
 		if m.listPane != nil {
 			m.listPane.SetDimensions(leftWidth, panelHeight)
 		}
-
-		// Right side is split vertically: hash pane on top, filename pane on bottom
-		if m.showFilenamePaneVal && panelHeight > 6 {
-			// Split vertically
-			hashPaneH := panelHeight / 2
-			filenamePaneH := panelHeight - hashPaneH - 1 // -1 for divider
-			if m.hashTablePane != nil {
-				m.hashTablePane.SetDimensions(rightWidth, hashPaneH)
-			}
-			if m.filenameTablePane != nil {
-				m.filenameTablePane.SetDimensions(rightWidth, filenamePaneH)
-			}
-		} else {
-			// Only show hash pane, full height
-			if m.hashTablePane != nil {
-				m.hashTablePane.SetDimensions(rightWidth, panelHeight)
-			}
+		if m.tablePane != nil {
+			m.tablePane.SetDimensions(rightWidth, panelHeight)
 		}
-
 		if m.banner != nil {
 			m.banner.SetDimensions(m.width)
 		}
@@ -178,75 +148,33 @@ func (m *ConsolidationModel) View() string {
 
 	var result strings.Builder
 
-	// If help modal is open, show it instead of normal view
-	if m.modalType == "help" {
-		if m.helpModal != nil {
-			m.helpModal.Width = m.width
-			m.helpModal.Height = m.height
-			return m.helpModal.Render()
-		}
-	}
-
 	// Render banner
 	if m.banner != nil {
 		result.WriteString(m.banner.Render())
 	}
 
-	// Update focus indicators on panes
-	if m.listPane != nil {
-		m.listPane.SetFocus(m.focusedPane == "list")
-	}
-	if m.hashTablePane != nil {
-		m.hashTablePane.SetFocus(m.focusedPane == "hash_table")
-	}
-	if m.filenameTablePane != nil {
-		m.filenameTablePane.SetFocus(m.focusedPane == "filename_table")
-	}
-
-	// Render list pane
-	var listView string
+	// Render panes side-by-side
+	var listView, tableView string
 	if m.listPane != nil {
 		listView = m.listPane.Render()
 	}
-
-	// Render right side panes (vertically split or single)
-	var rightPanelsView string
-	if m.showFilenamePaneVal {
-		// Both hash and filename panes visible - render vertically split
-		var hashTableView, filenameTableView string
-		if m.hashTablePane != nil {
-			hashTableView = m.hashTablePane.Render()
-		}
-		if m.filenameTablePane != nil {
-			filenameTableView = m.filenameTablePane.Render()
-		}
-		rightPanelsView = m.combineRightPanels(hashTableView, filenameTableView)
-	} else {
-		// Only hash pane visible
-		if m.hashTablePane != nil {
-			rightPanelsView = m.hashTablePane.Render()
-		}
+	if m.tablePane != nil {
+		tableView = m.tablePane.Render()
 	}
 
-	// Combine left and right panes horizontally
-	panelsView := m.combinePanels(listView, rightPanelsView)
+	// Combine panes horizontally
+	panelsView := m.combinePanels(listView, tableView)
 	result.WriteString(panelsView)
-
-	// Render error message if present
-	if m.lastError != "" {
-		fmt.Fprintf(&result, "⚠️ ERROR: %s\n", m.lastError)
-	}
 
 	// Render status bar
 	if m.statusBar != nil {
-		m.statusBar.SetFocusedPane(m.focusedPane)
 		result.WriteString(m.statusBar.Render())
 	}
 
 	return result.String()
 }
 
-// combinePanels combines two pane views side-by-side (left + right)
+// combinePanels combines two pane views side-by-side
 func (m *ConsolidationModel) combinePanels(leftPane, rightPane string) string {
 	leftLines := strings.Split(leftPane, "\n")
 	rightLines := strings.Split(rightPane, "\n")
@@ -272,18 +200,6 @@ func (m *ConsolidationModel) combinePanels(leftPane, rightPane string) string {
 		result.WriteString("\n")
 	}
 
-	return result.String()
-}
-
-// combineRightPanels combines hash and filename panes vertically (top + bottom)
-func (m *ConsolidationModel) combineRightPanels(hashPane, filenamePane string) string {
-	// Simply stack vertically with a divider line between them
-	// The panes themselves handle their rendering, we just concatenate
-	var result strings.Builder
-	result.WriteString(hashPane)
-	// Add a divider line - simple horizontal line
-	result.WriteString("─────────────────────────────────────────────────────────────────\n")
-	result.WriteString(filenamePane)
 	return result.String()
 }
 
@@ -332,72 +248,17 @@ func (m *ConsolidationModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.focusedPane = "list"
 		}
 	case "j":
-		// Navigate down in focused pane
-		switch m.focusedPane {
-		case "list":
-			if m.listPane != nil {
-				m.listPane.SelectionDown()
-				m.selectedIndex = m.listPane.GetSelectedIndex()
-				m.updateHashTablePane()
-			}
-		case "hash_table":
-			if m.hashTablePane != nil {
-				m.hashTablePane.SelectionDown()
-			}
-		case "filename_table":
-			if m.filenameTablePane != nil {
-				m.filenameTablePane.SelectionDown()
-			}
-		}
+		m.handleScroll("down")
+		// Update table pane when selection changes
+		m.updateTablePane()
 	case "k":
-		// Navigate up in focused pane
-		switch m.focusedPane {
-		case "list":
-			if m.listPane != nil {
-				m.listPane.SelectionUp()
-				m.selectedIndex = m.listPane.GetSelectedIndex()
-				m.updateHashTablePane()
-			}
-		case "hash_table":
-			if m.hashTablePane != nil {
-				m.hashTablePane.SelectionUp()
-			}
-		case "filename_table":
-			if m.filenameTablePane != nil {
-				m.filenameTablePane.SelectionUp()
-			}
-		}
-	case "w":
-		// Toggle filename pane visibility
-		m.ToggleFilenamePaneVisibility()
-		// Adjust focus if needed: if filename pane is hidden and focused, move to hash_table
-		if !m.showFilenamePaneVal && m.focusedPane == "filename_table" {
-			m.focusedPane = "hash_table"
-		}
+		m.handleScroll("up")
+		// Update table pane when selection changes
+		m.updateTablePane()
 	case "v":
-		// Toggle wide view in focused table pane
-		if m.focusedPane == "hash_table" && m.hashTablePane != nil {
-			m.hashTablePane.ToggleWideView()
-		} else if m.focusedPane == "filename_table" && m.filenameTablePane != nil {
-			m.filenameTablePane.ToggleWideView()
-		}
-	case "p":
-		// Open file for preview (only in table panes)
-		var selectedFile *browsing.FileVersion
-		if m.focusedPane == "hash_table" && m.hashTablePane != nil {
-			selectedFile = m.hashTablePane.GetSelectedFile()
-		} else if m.focusedPane == "filename_table" && m.filenameTablePane != nil {
-			selectedFile = m.filenameTablePane.GetSelectedFile()
-		}
-		if selectedFile != nil && selectedFile.FileInfo != nil {
-			// Construct full filepath for preview
-			fullPath := m.constructFilePath(selectedFile)
-			if fullPath != "" {
-				// TODO: Open file with system viewer (e.g., less, vim, etc.)
-				m.lastError = fmt.Sprintf("📁 Preview: %s", fullPath)
-			} else {
-				m.lastError = "❌ Cannot construct file path"
-			}
+		// Toggle wide view in table pane
+		if m.tablePane != nil {
+			m.tablePane.ToggleWideView()
 		}
 	case "K":
 		// Flag as KEEP (only in table panes)
@@ -429,13 +290,26 @@ func (m *ConsolidationModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// updateHashTablePane updates the hash table pane with the currently selected group
-func (m *ConsolidationModel) updateHashTablePane() {
-	if m.listPane != nil && m.hashTablePane != nil {
+// updateTablePane updates the table pane with the currently selected group
+func (m *ConsolidationModel) updateTablePane() {
+	if m.listPane != nil && m.tablePane != nil {
 		selectedGroup := m.listPane.GetSelectedGroup()
 		if selectedGroup != nil {
-			m.hashTablePane.SetGroup(selectedGroup)
+			m.tablePane.SetGroup(selectedGroup)
 		}
+	}
+}
+
+// handleScroll moves selection up/down
+func (m *ConsolidationModel) handleScroll(direction string) {
+	if m.listPane != nil {
+		switch direction {
+		case "down":
+			m.listPane.SelectionDown()
+		case "up":
+			m.listPane.SelectionUp()
+		}
+		m.selectedIndex = m.listPane.GetSelectedIndex()
 	}
 }
 
