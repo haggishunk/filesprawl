@@ -4,11 +4,11 @@ import "fmt"
 
 // QuitModal confirms saving and exiting
 type QuitModal struct {
-	title            string
-	message          string
-	keepCount        int
-	archiveCount     int
-	deleteCount      int
+	title        string
+	message      string
+	keepCount    int
+	archiveCount int
+	deleteCount  int
 }
 
 // NewQuitModal creates a quit confirmation modal
@@ -30,9 +30,9 @@ func (qm *QuitModal) Execute() ModalResult {
 	fmt.Printf("  📦 Archive: %d files\n", qm.archiveCount)
 	fmt.Printf("  🗑️  Delete:   %d files\n", qm.deleteCount)
 	fmt.Printf("[Exit]/[Cancel]: ")
-	
+
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 	return ModalResult{Confirmed: response == "y" || response == "yes"}
 }
 
@@ -43,8 +43,8 @@ func (qm *QuitModal) Cancel() {
 
 // ErrorModal displays an error message
 type ErrorModal struct {
-	title    string
-	message  string
+	title   string
+	message string
 }
 
 // NewErrorModal creates an error display modal
@@ -59,7 +59,7 @@ func NewErrorModal(title, message string) *ErrorModal {
 func (em *ErrorModal) Execute() ModalResult {
 	fmt.Printf("\n❌ %s\n%s\n", em.title, em.message)
 	fmt.Print("Press Enter to continue...")
-	fmt.Scanln()
+	_, _ = fmt.Scanln()
 	return ModalResult{Confirmed: true}
 }
 

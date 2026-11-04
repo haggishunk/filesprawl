@@ -1,6 +1,7 @@
 # Design: Restructure Project Layout
 
 ## Overview
+
 Restructure filesprawl to follow modern Go best practices with clear separation between CLI application and reusable library, enabling both command-line and programmatic usage.
 
 ## Current Structure (Before)
@@ -24,6 +25,7 @@ filesprawl/
 ```
 
 **Problems:**
+
 - All CLI code in one file
 - Business logic not usable as library
 - No separation of concerns
@@ -151,7 +153,7 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "filesprawl",
 	Short: "File indexing and duplicate detection across remote storage",
-	Long: `Filesprawl indexes and analyzes files across multiple remote 
+	Long: `Filesprawl indexes and analyzes files across multiple remote
 storage locations, identifying duplicates and optimizing storage usage.`,
 }
 
@@ -202,7 +204,7 @@ var (
 
 func init() {
 	rootCmd.AddCommand(indexCmd)
-	
+
 	indexCmd.Flags().StringVarP(&indexRemote, "remote", "r", "", "remote name (required)")
 	indexCmd.Flags().StringVarP(&indexPath, "path", "p", "", "path within remote")
 	indexCmd.MarkFlagRequired("remote")
@@ -210,39 +212,39 @@ func init() {
 
 func runIndex(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	
+
 	// Open repository using CLI utility
 	repo, cleanup, err := cli.OpenRepository(ctx)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
-	
+
 	// Get hostname
 	hostname, err := os.Hostname()
 	if err != nil {
 		return fmt.Errorf("failed to determine hostname: %w", err)
 	}
-	
+
 	// Normalize remote name
 	remoteName := strings.TrimSuffix(strings.TrimSpace(indexRemote), ":")
 	rem := remote.NewRemote(hostname, remoteName)
-	
+
 	// Create scanner
 	scn := operation.NewScanner(
 		operation.WithRemote(&rem),
 		operation.WithRepo(repo),
 	)
-	
+
 	// Configure rclone list
 	lo := rclone.NewListOption(rclone.ListOptionFilesOnly())
 	lc := rclone.NewListConfig(remoteName+":", indexPath, &lo)
-	
+
 	// Perform scan
 	if err := operation.Scan(ctx, &scn, lc); err != nil {
 		return err
 	}
-	
+
 	fmt.Fprintf(cmd.OutOrStdout(), "indexed remote %s from host %s\n", rem.Name, rem.Hostname)
 	return nil
 }
@@ -277,7 +279,7 @@ func OpenRepository(ctx context.Context) (*repository.ObjectRepository, func(), 
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing database url: %w", err)
 	}
-	
+
 	config.AfterConnect = func(_ context.Context, conn *pgx.Conn) error {
 		log.Printf("Connected to database with pid %d", conn.PgConn().PID())
 		return nil
@@ -378,6 +380,7 @@ import "github.com/haggishunk/filesprawl"
 ## Migration Strategy
 
 ### Phase 1: Structure (No Breaking Changes)
+
 1. Create directory structure
 2. Copy main.go to cmd/filesprawl/main.go
 3. Create symlink at root
@@ -385,6 +388,7 @@ import "github.com/haggishunk/filesprawl"
 5. Test everything still works
 
 ### Phase 2: Extract and Refactor
+
 1. Create internal/cli package
 2. Move CLI utilities to internal/cli
 3. Split commands into separate files
@@ -392,12 +396,14 @@ import "github.com/haggishunk/filesprawl"
 5. Tests still pass
 
 ### Phase 3: Enhance
+
 1. Add Cobra commands (if combined with migrate-to-cobra-cli)
 2. Create example programs
 3. Document library API
 4. Add godoc examples
 
 ### Phase 4: Finalize
+
 1. Deprecate root main.go (keep symlink or remove)
 2. Update all documentation
 3. Publish release with new structure
@@ -405,17 +411,20 @@ import "github.com/haggishunk/filesprawl"
 ## Benefits
 
 ### For CLI Users
+
 - No breaking changes
 - Better organized codebase
 - Eventually: better help, completion (with Cobra)
 
 ### For Library Users
+
 - Clean import: `import "github.com/haggishunk/filesprawl"`
 - Professional API
 - Reusable components
 - Example programs to learn from
 
 ### For Developers
+
 - Clear separation of concerns
 - Each command in its own file
 - Easy to add new commands
@@ -428,4 +437,3 @@ import "github.com/haggishunk/filesprawl"
 - [No nonsense guide to Go projects layout](https://laurentsv.com/blog/2024/10/19/no-nonsense-go-package-layout.html)
 - [Go Project Layout: What Actually Works](https://alnah.io/post/go-project-layout/)
 - Cobra CLI framework: https://github.com/spf13/cobra
-

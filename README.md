@@ -63,6 +63,7 @@ filesprawl duplicates --remote media --hash-type dropbox --min-size 1000000 --li
 ```
 
 available filters:
+
 - `--hash-type`: filter by hash type (md5, sha1, sha256, dropbox)
 - `--min-size`: minimum file size in bytes
 - `--limit`: maximum number of duplicate groups to return
@@ -72,7 +73,6 @@ with this index we can determine the following:
 
 - duplicates between remote storage locations
 - duplicates in same remote storage locations
-
 
 ## locality interface
 
@@ -125,6 +125,7 @@ filesprawl locality show-config
 ```
 
 Configuration is loaded from (in priority order):
+
 1. `FILESPRAWL_LOCALITY_CONFIG` environment variable
 2. `$HOME/.config/filesprawl/locality.json` (XDG Base Directory)
 3. `$HOME/.filesprawl/locality.json` (legacy location)

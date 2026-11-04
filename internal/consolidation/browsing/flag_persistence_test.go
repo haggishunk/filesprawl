@@ -2,8 +2,8 @@ package browsing
 
 import (
 	"context"
-	"testing"
 	"github.com/haggishunk/filesprawl/internal/consolidation/flags"
+	"testing"
 )
 
 func TestPersistentFlagManagerCreation(t *testing.T) {
@@ -36,13 +36,13 @@ func TestCountByType(t *testing.T) {
 	_ = context.Background() // Not used in stub implementation
 
 	fsm1 := pfm.GetOrCreateStateMachine(1)
-	fsm1.TransitionKeep()
+	_ = fsm1.TransitionKeep()
 
 	fsm2 := pfm.GetOrCreateStateMachine(2)
-	fsm2.TransitionKeep()
+	_ = fsm2.TransitionKeep()
 
 	fsm3 := pfm.GetOrCreateStateMachine(3)
-	fsm3.TransitionDelete(nil)
+	_ = fsm3.TransitionDelete(nil)
 
 	counts := pfm.CountByType()
 
@@ -58,7 +58,7 @@ func TestGetFlaggedFiles(t *testing.T) {
 	pfm := NewPersistentFlagManager(1, nil)
 
 	fsm := pfm.GetOrCreateStateMachine(99)
-	fsm.TransitionKeep()
+	_ = fsm.TransitionKeep()
 
 	flagged := pfm.GetFlaggedFiles()
 
@@ -130,7 +130,7 @@ func TestPersistSkipTransition(t *testing.T) {
 	ctx := context.Background()
 
 	fsm := pfm.GetOrCreateStateMachine(203)
-	fsm.TransitionKeep()
+	_ = fsm.TransitionKeep()
 
 	err := pfm.PersistSkip(ctx, 203)
 	if err != nil {

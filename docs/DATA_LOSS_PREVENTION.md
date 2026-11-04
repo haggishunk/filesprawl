@@ -5,16 +5,19 @@
 Before deleting or consolidating any files, run these three checks in order:
 
 ### 1. Detect Name Collisions
+
 **Script**: `db/scripts/detect_name_collisions.sql`
 
 **Problem**: Different files with same filename (e.g., two photos named "photo.jpg")
 
 **Check**: Verify all variants are preserved before consolidating by filename
+
 ```bash
 psql $FILESPRAWL_DATABASE_URL -f db/scripts/detect_name_collisions.sql
 ```
 
 **Result Interpretation**:
+
 - ✅ OK: All unique variants preserved → Safe to consolidate
 - ⚠️ WARNING: Only 1 variant preserved → **DATA LOSS RISK!**
 - 🚨 CRITICAL: Variants completely missing → **UNRECOVERABLE DATA LOSS!**
@@ -22,17 +25,20 @@ psql $FILESPRAWL_DATABASE_URL -f db/scripts/detect_name_collisions.sql
 ---
 
 ### 2. Check Deletion Safety
+
 **Script**: `db/scripts/check_directory_deletion_safety.sql`
 
 **Problem**: Deleting files that don't exist elsewhere
 
 **Check**: Verify all files in a directory exist elsewhere before deletion
+
 ```bash
 psql $FILESPRAWL_DATABASE_URL -v "dir_pattern='%target/dir/%'" \
   -f db/scripts/check_directory_deletion_safety.sql
 ```
 
 **Result Interpretation**:
+
 - ✅ ZERO-BYTE (safe): Corrupted/incomplete files
 - ✅ Safe (exists elsewhere): Verified copies with non-zero bytes
 - ⚠️ RISKY (only copy!): **DO NOT DELETE!**
@@ -40,14 +46,16 @@ psql $FILESPRAWL_DATABASE_URL -v "dir_pattern='%target/dir/%'" \
 ---
 
 ### 3. Verify by Hash and Size
+
 **Problem**: Same hash but 0-byte files (incomplete downloads)
 
 **Check**: Before consolidating, ensure:
+
 ```sql
 -- For each hash:
 -- 1. Zero-byte copies → safe to delete
 -- 2. Non-zero copies → must exist elsewhere before deleting
-SELECT 
+SELECT
   hash_value,
   COUNT(DISTINCT CASE WHEN size > 0 THEN file_id END) as nonzero_copies,
   COUNT(DISTINCT CASE WHEN size = 0 THEN file_id END) as zero_copies
@@ -61,6 +69,7 @@ HAVING COUNT(*) > 1;
 ## Safe Consolidation Workflow
 
 ### Step 1: Analyze
+
 ```bash
 # Check for name collisions
 psql $FILESPRAWL_DATABASE_URL -f db/scripts/detect_name_collisions.sql
@@ -70,6 +79,7 @@ cd /path/to/consolidate
 ```
 
 ### Step 2: Verify Safety
+
 ```bash
 # Check if all files exist elsewhere
 psql $FILESPRAWL_DATABASE_URL -v "dir_pattern='%/path/to/consolidate/%'" \
@@ -77,27 +87,33 @@ psql $FILESPRAWL_DATABASE_URL -v "dir_pattern='%/path/to/consolidate/%'" \
 ```
 
 ### Step 3: Decision
+
 If any:
+
 - ⚠️ WARNING collisions → Don't consolidate by filename
 - 🚨 CRITICAL variants → DON'T DELETE!
 - ⚠️ RISKY files → DON'T DELETE!
 
 Otherwise:
+
 - ✅ Safe to proceed with consolidation
 
 ### Step 4: Archive
+
 ```bash
 # Archive the directory (don't delete yet)
 tar czf archive-$(date +%Y%m%d).tar.gz /path/to/consolidate
 ```
 
 ### Step 5: Verify Archive
+
 ```bash
 # Verify archive integrity
 tar tzf archive-$(date +%Y%m%d).tar.gz | wc -l
 ```
 
 ### Step 6: Delete
+
 ```bash
 # Only delete after verified archive
 rm -rf /path/to/consolidate
@@ -108,14 +124,18 @@ rm -rf /path/to/consolidate
 ## Your Data: Analysis Summary
 
 ### Filename Collisions
+
 **Result**: ✅ **ALL SAFE**
+
 - AlbumArtSmall.jpg: 224 unique versions (all preserved)
 - Folder.jpg: 224 unique versions (all preserved)
 - Music files: 2-3 variants each (all preserved)
 - Photos: 13-15 variants each (all preserved)
 
 ### Zero-Byte Files
+
 **Result**: ✅ **ALL SAFE**
+
 - travis-transfer/2019/03/10: 252 zero-byte (safe to delete)
 - 28 non-zero files with copies elsewhere (safe to delete)
 
@@ -149,6 +169,7 @@ rm -rf /path/to/consolidate
 ## References
 
 See also:
+
 - `DELETION_SAFETY.md` — Directory deletion safety checker
 - `NAME_COLLISIONS.md` — Filename collision detection
 - `duplicates` command — Find actual duplicates by hash

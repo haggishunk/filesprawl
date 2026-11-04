@@ -16,7 +16,7 @@ func TestListRemotes(t *testing.T) {
 		if r.URL.Path != "/config/listremotes" {
 			t.Fatalf("expected config/listremotes path, got %s", r.URL.Path)
 		}
-		fmt.Fprint(w, `{"remotes":["media:","backup:"]}`)
+		_, _ = fmt.Fprint(w, `{"remotes":["media:","backup:"]}`)
 	}))
 	defer server.Close()
 
@@ -42,7 +42,7 @@ func TestListRemotes(t *testing.T) {
 func TestListRemotesError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, `{"error":"boom"}`)
+		_, _ = fmt.Fprint(w, `{"error":"boom"}`)
 	}))
 	defer server.Close()
 

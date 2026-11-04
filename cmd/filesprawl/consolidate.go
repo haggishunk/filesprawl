@@ -11,8 +11,8 @@ import (
 	"github.com/haggishunk/filesprawl/internal/consolidation/flags"
 	"github.com/haggishunk/filesprawl/internal/consolidation/ui"
 	"github.com/haggishunk/filesprawl/internal/consolidation/users"
-	"github.com/haggishunk/filesprawl/internal/repository"
 	"github.com/haggishunk/filesprawl/internal/rclone"
+	"github.com/haggishunk/filesprawl/internal/repository"
 	"github.com/spf13/cobra"
 )
 

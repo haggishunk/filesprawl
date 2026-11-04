@@ -37,11 +37,11 @@ func (kr *KeyBindingRegistry) Handle(key rune, ctx context.Context, widget widge
 	if kr == nil {
 		return fmt.Errorf("key registry not initialized")
 	}
-	
+
 	if handler, ok := kr.handlers[key]; ok {
 		return handler(ctx, widget, session)
 	}
-	
+
 	// Unknown key: silently ignore
 	return nil
 }

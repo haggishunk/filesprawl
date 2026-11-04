@@ -1,9 +1,11 @@
 # Change: Add Duplicates CLI Command
 
 ## Why
+
 The duplicate detection backend (`internal/analysis` package) is fully implemented and tested, but there is no CLI command to expose this functionality to users. Users need a command-line interface to discover and analyze duplicate files within and across their indexed remotes, making it easy to identify storage waste and redundant files.
 
 ## What Changes
+
 - Add a `duplicates` CLI command that exposes the duplicate detection functionality
 - Support finding duplicates within a specific remote storage location
 - Support finding duplicates across all indexed remotes
@@ -12,6 +14,7 @@ The duplicate detection backend (`internal/analysis` package) is fully implement
 - Return proper exit codes and error messages
 
 ## Impact
+
 - Affected specs:
   - New capability `duplicates-cli`
 - Affected code:
@@ -23,4 +26,3 @@ The duplicate detection backend (`internal/analysis` package) is fully implement
   - Quickly identify duplicate files to reclaim storage space
   - Understand file redundancy across their remote storage locations
   - Make informed decisions about which duplicate copies to remove
-

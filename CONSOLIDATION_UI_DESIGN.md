@@ -3,6 +3,7 @@
 ## Overview
 
 The new consolidation TUI uses **Bubble Tea** with a **2-column layout**:
+
 - **Left (40%)**: Hash list - unique duplicate groups, selectable
 - **Right (60%)**: File table - all files in selected group, with remote/filename/size/status
 
@@ -29,12 +30,14 @@ The new consolidation TUI uses **Bubble Tea** with a **2-column layout**:
 ## Key Features
 
 ### Hash List Panel (Left)
+
 - Lists unique duplicate groups by content hash
 - Shows: 🟢/🟡/🔴 indicator + hash + copy count + location count
 - Selection with j/k keyboard navigation
 - Default view on startup
 
 ### File Table Panel (Right)
+
 - Displays all files in selected hash group
 - Columns: remote | filename | size | status
 - Status: ✓=safe, 🟡=caution, 🔴=critical
@@ -46,6 +49,7 @@ The new consolidation TUI uses **Bubble Tea** with a **2-column layout**:
 **Core Rule**: Cannot delete ALL copies of a (remote, filename) pair.
 
 Example:
+
 ```
 Hash: abc123
 ├─ (s3, photo.jpg, 2.5M)       ← DELETE ✓ allowed (copies on dbox + local)
@@ -57,16 +61,16 @@ But: If s3 + dbox both deleted, cannot delete local's only copy
 
 ## Keyboard Shortcuts
 
-| Key | Panel | Action |
-|-----|-------|--------|
-| j/k | Both | Scroll/Navigate |
-| v | Right | Toggle filepath column (wide view) |
-| K | Right | Mark file as KEEP |
-| a | Right | Mark file as ARCHIVE |
-| d | Right | Mark file as DELETE (safety checked) |
-| s | Right | Skip/clear flags |
-| ? | Any | Show help modal |
-| q | Any | Quit and review summary |
+| Key | Panel | Action                               |
+| --- | ----- | ------------------------------------ |
+| j/k | Both  | Scroll/Navigate                      |
+| v   | Right | Toggle filepath column (wide view)   |
+| K   | Right | Mark file as KEEP                    |
+| a   | Right | Mark file as ARCHIVE                 |
+| d   | Right | Mark file as DELETE (safety checked) |
+| s   | Right | Skip/clear flags                     |
+| ?   | Any   | Show help modal                      |
+| q   | Any   | Quit and review summary              |
 
 ## Data Flow
 
@@ -82,6 +86,7 @@ But: If s3 + dbox both deleted, cannot delete local's only copy
 ## Safety Logic
 
 Before allowing DELETE flag:
+
 1. Get file's (remote, filename) pair
 2. Count all files with same (remote, filename) in group
 3. Count how many are NOT flagged DELETE
@@ -99,6 +104,7 @@ ConsolidationModel (main)
 ```
 
 Each component:
+
 - Pure render function
 - Keyboard event handler
 - State updates through messages
@@ -106,7 +112,7 @@ Each component:
 ## Next Steps (Phase 2+)
 
 1. Implement ListPane component
-2. Implement TablePane component  
+2. Implement TablePane component
 3. Wire keyboard handlers
 4. Build safety checker
 5. Test with real data

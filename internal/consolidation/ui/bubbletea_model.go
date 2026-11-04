@@ -18,11 +18,11 @@ type ConsolidationModel struct {
 	flagManager    *browsing.PersistentFlagManager
 
 	// UI state
-	selectedIndex int                   // Currently selected duplicate group
-	isHashView    bool                  // true = hash view, false = filename view
-	modalType     string                // Current modal being shown ("" = none)
-	width         int                   // Terminal width
-	height        int                   // Terminal height
+	selectedIndex int    // Currently selected duplicate group
+	isHashView    bool   // true = hash view, false = filename view
+	modalType     string // Current modal being shown ("" = none)
+	width         int    // Terminal width
+	height        int    // Terminal height
 
 	// Settings
 	version    string
@@ -44,18 +44,18 @@ func NewConsolidationModel(
 	remotes []string,
 ) *ConsolidationModel {
 	return &ConsolidationModel{
-		ctx:                 ctx,
-		sessionManager:      sessionManager,
-		flagManager:         flagManager,
-		duplicateGroups:     duplicateGroups,
-		selectedIndex:       0,
-		isHashView:          true,
-		modalType:           "",
-		width:               80,
-		height:              24,
-		version:             version,
-		reviewMode:          reviewMode,
-		remotes:             remotes,
+		ctx:             ctx,
+		sessionManager:  sessionManager,
+		flagManager:     flagManager,
+		duplicateGroups: duplicateGroups,
+		selectedIndex:   0,
+		isHashView:      true,
+		modalType:       "",
+		width:           80,
+		height:          24,
+		version:         version,
+		reviewMode:      reviewMode,
+		remotes:         remotes,
 	}
 }
 

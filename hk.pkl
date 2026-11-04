@@ -1,0 +1,45 @@
+amends "package://github.com/jdx/hk/releases/download/v2.11.0/hk@2.11.0#/Config.pkl"
+
+import "package://github.com/jdx/hk/releases/download/v2.11.0/hk@2.11.0#/Builtins.pkl"
+// Using a coding agent? See https://hk.jdx.dev/agents
+
+local linters = new Mapping {
+  ["actionlint"] = Builtins.actionlint
+  ["dclint"] = Builtins.dclint
+  ["go_fmt"] = Builtins.go_fmt
+  ["golangci_lint"] = Builtins.golangci_lint
+  ["golangci_lint_fmt"] = Builtins.golangci_lint_fmt
+  ["gomod_tidy"] = Builtins.gomod_tidy
+  ["pkl"] = Builtins.pkl
+  ["pkl-format"] = Builtins.pkl_format
+  ["prettier"] = (Builtins.prettier) {
+    exclude =
+      List(
+        "*.yaml",
+        ".github/workflows/*.yml",
+        ".github/workflows/*.yaml",
+      )
+  }
+  ["ryl"] = (Builtins.ryl) {
+    exclude =
+      List(
+        "docker-compose.yaml",
+        ".github/workflows/*.yml",
+        ".github/workflows/*.yaml",
+      )
+  }
+  ["ryl-format"] = (Builtins.ryl_format) {
+    exclude =
+      List(
+        "docker-compose.yaml",
+        ".github/workflows/*.yml",
+        ".github/workflows/*.yaml",
+      )
+  }
+  ["shellcheck"] = Builtins.shellcheck
+  ["shellharden"] = Builtins.shellharden
+  ["shfmt"] = Builtins.shfmt
+  ["zizmor"] = Builtins.zizmor
+}
+
+steps = linters

@@ -2,8 +2,8 @@ package browsing
 
 import (
 	"fmt"
-	"strings"
 	"github.com/haggishunk/filesprawl/internal/consolidation/flags"
+	"strings"
 )
 
 // SummaryRenderer renders consolidation decision summaries
@@ -30,11 +30,11 @@ func (sr *SummaryRenderer) RenderDecisionSummary(session *BrowsingSession) strin
 	keepCount, archiveCount, deleteCount := sr.countDecisions(session.Flags)
 
 	// Show summary counts
-	output.WriteString(fmt.Sprintf("KEEP:    %3d files | 🟢 Will be preserved\n", keepCount))
-	output.WriteString(fmt.Sprintf("ARCHIVE: %3d files | 📦 Will be copied to backup location\n", archiveCount))
-	output.WriteString(fmt.Sprintf("DELETE:  %3d files | 🗑️  Will be permanently removed\n", deleteCount))
-	output.WriteString(fmt.Sprintf("─────────────────────────────────────\n"))
-	output.WriteString(fmt.Sprintf("TOTAL:   %3d files\n\n", keepCount+archiveCount+deleteCount))
+	fmt.Fprintf(&output, "KEEP:    %3d files | 🟢 Will be preserved\n", keepCount)
+	fmt.Fprintf(&output, "ARCHIVE: %3d files | 📦 Will be copied to backup location\n", archiveCount)
+	fmt.Fprintf(&output, "DELETE:  %3d files | 🗑️  Will be permanently removed\n", deleteCount)
+	output.WriteString("─────────────────────────────────────\n")
+	fmt.Fprintf(&output, "TOTAL:   %3d files\n\n", keepCount+archiveCount+deleteCount)
 
 	// Show detail breakdown by action
 	sr.renderKeepSummary(&output, session.Flags)
@@ -61,9 +61,9 @@ func (sr *SummaryRenderer) renderKeepSummary(output *strings.Builder, flagMap ma
 
 	output.WriteString("KEEP - Will be preserved:\n")
 	for _, flag := range keepFiles {
-		output.WriteString(fmt.Sprintf("  🟢 File ID %d\n", flag.FileID))
+		fmt.Fprintf(output, "  🟢 File ID %d\n", flag.FileID)
 		if flag.Reason != nil && *flag.Reason != "" {
-			output.WriteString(fmt.Sprintf("     Reason: %s\n", *flag.Reason))
+			fmt.Fprintf(output, "     Reason: %s\n", *flag.Reason)
 		}
 	}
 	output.WriteString("\n")
@@ -90,7 +90,7 @@ func (sr *SummaryRenderer) renderArchiveSummary(output *strings.Builder, flagMap
 	}
 
 	for dest, count := range byDest {
-		output.WriteString(fmt.Sprintf("  📦 → %s: %d files\n", dest, count))
+		fmt.Fprintf(output, "  📦 → %s: %d files\n", dest, count)
 	}
 	output.WriteString("\n")
 }
@@ -105,9 +105,9 @@ func (sr *SummaryRenderer) renderDeleteSummary(output *strings.Builder, flagMap 
 
 	output.WriteString("DELETE - Will be permanently removed:\n")
 	for _, flag := range deleteFiles {
-		output.WriteString(fmt.Sprintf("  🗑️  File ID %d\n", flag.FileID))
+		fmt.Fprintf(output, "  🗑️  File ID %d\n", flag.FileID)
 		if flag.Reason != nil && *flag.Reason != "" {
-			output.WriteString(fmt.Sprintf("     Reason: %s\n", *flag.Reason))
+			fmt.Fprintf(output, "     Reason: %s\n", *flag.Reason)
 		}
 	}
 	output.WriteString("\n")
@@ -122,7 +122,7 @@ func (sr *SummaryRenderer) renderWarnings(output *strings.Builder, flagMap map[i
 	}
 
 	output.WriteString("⚠️  WARNINGS:\n")
-	output.WriteString(fmt.Sprintf("  • %d files will be permanently deleted\n", deleteCount))
+	fmt.Fprintf(output, "  • %d files will be permanently deleted\n", deleteCount)
 	output.WriteString("  • This action cannot be undone\n")
 	output.WriteString("  • Files should be backed up before proceeding\n\n")
 }

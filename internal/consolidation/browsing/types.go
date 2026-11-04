@@ -36,29 +36,29 @@ type Location struct {
 
 // FileVersion represents a file with a specific hash
 type FileVersion struct {
-	FileID   int
-	FileInfo *object.Meta
-	Hash     *object.Hash
+	FileID    int
+	FileInfo  *object.Meta
+	Hash      *object.Hash
 	Locations []Location
-	Flag     *flags.Flag
+	Flag      *flags.Flag
 }
 
 // DuplicateGroup represents a group of duplicate files (by hash or filename)
 type DuplicateGroup struct {
-	Identifier string         // Hash value or filename
-	Count      int            // Total copies or versions
-	Versions   []FileVersion  // Individual files/variants
-	Flag       *flags.Flag    // Group-level flag (if set)
+	Identifier string        // Hash value or filename
+	Count      int           // Total copies or versions
+	Versions   []FileVersion // Individual files/variants
+	Flag       *flags.Flag   // Group-level flag (if set)
 }
 
 // BrowsingSession represents the current browsing state
 type BrowsingSession struct {
-	UserID       int
-	CurrentView  ViewType
+	UserID          int
+	CurrentView     ViewType
 	DuplicateGroups []DuplicateGroup
-	ExpandedItems map[string]bool // Track which items are expanded
-	Flags        map[int]*flags.Flag // fileID -> Flag
-	Cursor       int // Current cursor position
+	ExpandedItems   map[string]bool     // Track which items are expanded
+	Flags           map[int]*flags.Flag // fileID -> Flag
+	Cursor          int                 // Current cursor position
 }
 
 // ViewData represents data needed for rendering a view

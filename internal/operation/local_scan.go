@@ -110,7 +110,9 @@ func persistLocalFile(ctx context.Context, ls *LocalScanner, scanRoot string, fi
 	if err != nil {
 		return fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	// Compute hashes
 	hashes := make(map[string]string)

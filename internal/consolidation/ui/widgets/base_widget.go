@@ -6,9 +6,9 @@ import (
 
 // BaseListWidget wraps a gotui List widget for common functionality
 type BaseListWidget struct {
-	list       *widgets.List
-	title      string
-	rows       []string
+	list                *widgets.List
+	title               string
+	rows                []string
 	x, y, width, height int // Rectangle dimensions
 }
 

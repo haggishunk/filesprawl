@@ -11,12 +11,12 @@ import (
 
 // ExecutionResult represents the result of executing consolidation
 type ExecutionResult struct {
-	KeepCount     int
-	ArchiveCount  int
-	DeleteCount   int
-	SuccessCount  int
-	FailureCount  int
-	Errors        []string
+	KeepCount    int
+	ArchiveCount int
+	DeleteCount  int
+	SuccessCount int
+	FailureCount int
+	Errors       []string
 }
 
 // FileRepository defines the interface for file operations
@@ -143,11 +143,11 @@ func (e *Executor) GetExecutionSummary(result *ExecutionResult) string {
 	summary += "║              CONSOLIDATION EXECUTION SUMMARY                    ║\n"
 	summary += "╚════════════════════════════════════════════════════════════════╝\n\n"
 
-	summary += fmt.Sprintf("Actions Executed:\n")
+	summary += "Actions Executed:\n"
 	summary += fmt.Sprintf("  🟢 KEEP:    %3d files (no action)\n", result.KeepCount)
 	summary += fmt.Sprintf("  📦 ARCHIVE: %3d files\n", result.ArchiveCount)
 	summary += fmt.Sprintf("  🗑️  DELETE:  %3d files\n", result.DeleteCount)
-	summary += fmt.Sprintf("─────────────────────────────────────\n")
+	summary += "─────────────────────────────────────\n"
 	summary += fmt.Sprintf("  ✓ Success: %3d operations\n", result.SuccessCount)
 	summary += fmt.Sprintf("  ✗ Failed:  %3d operations\n", result.FailureCount)
 

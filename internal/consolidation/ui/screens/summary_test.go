@@ -10,7 +10,7 @@ import (
 func TestNewSummaryScreen(t *testing.T) {
 	sessionMgr := browsing.NewSessionManager(1, nil)
 	screen := NewSummaryScreen(sessionMgr)
-	
+
 	if screen == nil {
 		t.Fatal("expected non-nil SummaryScreen")
 	}
@@ -24,7 +24,7 @@ func TestSummaryScreenShow_NoSession(t *testing.T) {
 	screen := &SummaryScreen{
 		sessionManager: nil,
 	}
-	
+
 	_, err := screen.Show(context.Background())
 	if err == nil {
 		t.Fatal("expected error when session manager is nil")
@@ -35,7 +35,7 @@ func TestSummaryScreenGetSummary_NoSession(t *testing.T) {
 	screen := &SummaryScreen{
 		sessionManager: nil,
 	}
-	
+
 	summary := screen.GetSummary()
 	if summary == "" {
 		t.Fatal("expected non-empty error message")
@@ -45,7 +45,7 @@ func TestSummaryScreenGetSummary_NoSession(t *testing.T) {
 func TestSummaryScreenGetSummary_WithSession(t *testing.T) {
 	sessionMgr := browsing.NewSessionManager(1, nil)
 	screen := NewSummaryScreen(sessionMgr)
-	
+
 	summary := screen.GetSummary()
 	// Should return something (even if empty session)
 	if summary == "" {

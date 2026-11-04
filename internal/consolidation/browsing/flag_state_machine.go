@@ -12,11 +12,11 @@ type FlagStateMachine struct {
 
 // FlagState represents the current flagging state of a file
 type FlagState struct {
-	FileID       int
-	FlagType     flags.FlagType
-	Reason       *string
-	ArchiveDest  *string
-	IsModified   bool
+	FileID      int
+	FlagType    flags.FlagType
+	Reason      *string
+	ArchiveDest *string
+	IsModified  bool
 }
 
 // NewFlagStateMachine creates a new state machine for a file
@@ -157,4 +157,3 @@ func (fsm *FlagStateMachine) GetTransitionDescription() string {
 		return "Unknown state"
 	}
 }
-    
