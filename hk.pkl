@@ -13,7 +13,7 @@ local linters = new Mapping {
   ["pkl"] = Builtins.pkl
   ["pkl-format"] = Builtins.pkl_format
   ["prettier"] = (Builtins.prettier) {
-    exclude = List("*.yaml")
+    exclude = List("*.yaml", ".github/workflows/*.yml")
   }
   ["ryl"] = Builtins.ryl
   ["ryl-format"] = (Builtins.ryl_format) {
