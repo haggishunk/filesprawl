@@ -10,13 +10,14 @@ import (
 
 // mockRepo implements duplicateRepo for testing.
 type mockRepo struct {
-	hashGroups  []repository.HashGroup
-	fileRecords []repository.FileRecord
-	filesMap    repository.FilesByHashMap
-	acrossErr   error
-	withinErr   error
-	filesErr    error
-	batchErr    error
+	hashGroups     []repository.HashGroup
+	fileRecords    []repository.FileRecord
+	filesMap       repository.FilesByHashMap
+	filenameGroups []repository.FilenameGroup
+	acrossErr      error
+	withinErr      error
+	filesErr       error
+	batchErr       error
 }
 
 func (m *mockRepo) FindDuplicatesAcrossRemotes(_ context.Context, _ string, _, _ int) ([]repository.HashGroup, error) {
@@ -27,12 +28,24 @@ func (m *mockRepo) FindDuplicatesWithinRemote(_ context.Context, _, _ string, _,
 	return m.hashGroups, m.withinErr
 }
 
+func (m *mockRepo) FindDuplicateFilenamesAcrossRemotes(_ context.Context, _ int64, _, _ int) ([]repository.FilenameGroup, error) {
+	return m.filenameGroups, m.acrossErr
+}
+
+func (m *mockRepo) FindDuplicateFilenamesWithinRemote(_ context.Context, _ string, _ int64, _, _ int) ([]repository.FilenameGroup, error) {
+	return m.filenameGroups, m.withinErr
+}
+
 func (m *mockRepo) GetFilesByHash(_ context.Context, _, _ string, _ int64) ([]repository.FileRecord, error) {
 	return m.fileRecords, m.filesErr
 }
 
 func (m *mockRepo) GetFilesByHashes(_ context.Context, _ []repository.HashTypePair, _ int64) (repository.FilesByHashMap, error) {
 	return m.filesMap, m.batchErr
+}
+
+func (m *mockRepo) GetFilesByFilename(_ context.Context, _ string, _ int64) ([]repository.FileRecord, error) {
+	return m.fileRecords, m.filesErr
 }
 
 var twoFiles = []repository.FileRecord{
