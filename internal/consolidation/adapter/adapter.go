@@ -60,13 +60,13 @@ func toFileVersions(files []analysis.FileInfo, hashValue, hashType string) []bro
 		}
 
 		fv := browsing.FileVersion{
-			FileID:       file.ID,
-			FileInfo:     meta,
-			Hash:         hash,
-			Locations:    locations,
-			Flag:         nil, // File-level flags are not set during initial conversion
-			LocationId:   file.LocationId,
-			LocationName: file.LocationName,
+			FileID:     file.ID,
+			FileInfo:   meta,
+			Hash:       hash,
+			Locations:  locations,
+			Flag:       nil, // File-level flags are not set during initial conversion
+			RemoteName: file.RemoteName,
+			Hostname:   file.Hostname,
 		}
 		versions = append(versions, fv)
 	}
