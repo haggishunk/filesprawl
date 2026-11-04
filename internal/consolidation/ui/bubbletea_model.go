@@ -424,32 +424,35 @@ func (m *ConsolidationModel) handleAction(action string) {
 }
 
 // constructFilePath builds the full filepath for opening/previewing a file
-// Local files: /scan_root/filepath (or just scan_root if path is relative)
-// Rclone files: remote_name:filepath
+// Local files: RemoteName is the canonical local path, append relative Path
+// Rclone files: RemoteName:Path
 func (m *ConsolidationModel) constructFilePath(version *browsing.FileVersion) string {
 	if version == nil || version.FileInfo == nil {
 		return ""
 	}
 
-	// If ScanRoot is set, it's a local file
+	// Determine if this is a local or rclone file based on whether ScanRoot is set
+	// (local files have scan_root, rclone files have scan_root = NULL)
 	if version.FileInfo.ScanRoot != "" {
-		// Local file: construct full path from scan root + relative path
-		// ScanRoot is like "/goblet/light" and Path is like "photos/travis-transfer/..."
-		// Result should be: "/goblet/light/photos/travis-transfer/..."
+		// Local file: RemoteName is the canonical full path root
+		// Path is the relative path within that root
+		// Example: RemoteName="/mnt/data", Path="photos/IMG_0587.MOV"
+		// Result: "/mnt/data/photos/IMG_0587.MOV"
 		if version.FileInfo.Path == "" {
-			return version.FileInfo.ScanRoot
+			return version.RemoteName
 		}
-		return fmt.Sprintf("%s/%s", version.FileInfo.ScanRoot, version.FileInfo.Path)
+		return fmt.Sprintf("%s/%s", version.RemoteName, version.FileInfo.Path)
 	}
 
-	// Rclone remote file: construct as remote_name:path
-	// RemoteName is like "goblet" and Path is like "photos/travis-transfer/..."
-	// Result should be: "goblet:photos/travis-transfer/..."
+	// Rclone file: RemoteName is the rclone remote identifier
+	// Path is the path within the remote
+	// Example: RemoteName="goblet", Path="photos/IMG_0587.MOV"
+	// Result: "goblet:photos/IMG_0587.MOV"
 	if version.RemoteName != "" && version.FileInfo.Path != "" {
 		return fmt.Sprintf("%s:%s", version.RemoteName, version.FileInfo.Path)
 	}
 
-	// Fallback to just the path
+	// Fallback
 	return version.FileInfo.Path
 }
 
