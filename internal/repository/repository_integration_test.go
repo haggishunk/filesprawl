@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -69,10 +70,18 @@ func writeRaw(t *testing.T, ctx context.Context, repo *ObjectRepository, hashVal
 
 func writeMetaRaw(t *testing.T, ctx context.Context, repo *ObjectRepository, name, path, mime string) int {
 	t.Helper()
+	// Ensure location exists first
+	loc := location.RemoteLocation("test-remote")
+	loc.Persisted = false
+	err := repo.EnsureLocation(ctx, &loc)
+	if err != nil {
+		t.Fatalf("ensure location: %v", err)
+	}
+
 	var id int
-	err := repo.db.QueryRow(ctx,
-		`INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size) VALUES ($1, $2, $3, 512) RETURNING id`,
-		name, path, mime,
+	err = repo.db.QueryRow(ctx,
+		`INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, location_id, absolute_path) VALUES ($1, $2, $3, 512, $4, $5) RETURNING id`,
+		name, path, mime, loc.Id, path,
 	).Scan(&id)
 	if err != nil {
 		t.Fatalf("seed meta: %v", err)
@@ -212,6 +221,8 @@ func TestIntegration_PersistResult_PersistsMetaAndHashes(t *testing.T) {
 	}
 
 	rem := remote.NewRcloneRemote(loc.Name, "integ_remote_"+stamp)
+	rem.Location = loc
+	rem.Location.Persisted = true
 	rem.LocationId = loc.Id
 
 	item1 := rclone.ListResponseItem{
@@ -255,21 +266,42 @@ func TestIntegration_PersistLocalResult_ScanRootDeduplication(t *testing.T) {
 	stamp := time.Now().Format("150405.000")
 	rootA := "/integ/photos-" + stamp
 	rootB := "/integ/photos-alt-" + stamp
-	remA := remote.NewLocalRemote("integ-host", rootA)
-	remB := remote.NewLocalRemote("integ-host", rootB)
+
+	// Create location (hostname-based for local scans)
+	hostname := "integ-host"
+	loc := location.LocalLocation(hostname)
+	if err := repo.EnsureLocation(ctx, &loc); err != nil {
+		t.Fatalf("EnsureLocation failed: %v", err)
+	}
+
+	remA := remote.NewLocalRemote(hostname, rootA)
+	remA.LocationId = loc.Id
+	remB := remote.NewLocalRemote(hostname, rootB)
+	remB.LocationId = loc.Id
 
 	// Same file name and content scanned under two different roots
 	hashVal := "integ-crossroot-hash-" + stamp
 	hashes := map[string]string{"md5": hashVal}
-	mA := object.NewMeta("a.jpg", "a.jpg", "image/jpeg", object.WithMetaSize(512), object.WithMetaScanRoot(rootA))
-	mB := object.NewMeta("a.jpg", "a.jpg", "image/jpeg", object.WithMetaSize(512), object.WithMetaScanRoot(rootB))
+
+	absolutePathA := filepath.Join(rootA, "a.jpg")
+	absolutePathB := filepath.Join(rootB, "a.jpg")
+
+	mA := object.NewMeta("a.jpg", "a.jpg", "image/jpeg",
+		object.WithMetaSize(512),
+		object.WithMetaScanRoot(rootA),
+		object.WithMetaLocationId(loc.Id),
+		object.WithMetaAbsolutePath(absolutePathA))
+	mB := object.NewMeta("a.jpg", "a.jpg", "image/jpeg",
+		object.WithMetaSize(512),
+		object.WithMetaScanRoot(rootB),
+		object.WithMetaLocationId(loc.Id),
+		object.WithMetaAbsolutePath(absolutePathB))
 
 	defer func() {
 		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_meta_id IN ($1, $2)`, mA.Id, mB.Id)
-		_, _ = repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE object_meta_id IN ($1, $2)`, mA.Id, mB.Id)
 		_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2)`, mA.Id, mB.Id)
 		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE hash_value = $1`, hashVal)
-		_, _ = repo.db.Exec(ctx, `DELETE FROM remote WHERE id IN ($1, $2)`, remA.Id, remB.Id)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM location WHERE id = $1`, loc.Id)
 	}()
 
 	if err := repo.PersistLocalResult(ctx, &remA, &mA, hashes); err != nil {
@@ -323,7 +355,11 @@ func TestIntegration_PersistLocalResult_ScanRootDeduplication(t *testing.T) {
 	}
 
 	// Rescanning the same root reuses the existing record (idempotent)
-	mA2 := object.NewMeta("a.jpg", "a.jpg", "image/jpeg", object.WithMetaSize(512), object.WithMetaScanRoot(rootA))
+	mA2 := object.NewMeta("a.jpg", "a.jpg", "image/jpeg",
+		object.WithMetaSize(512),
+		object.WithMetaScanRoot(rootA),
+		object.WithMetaLocationId(loc.Id),
+		object.WithMetaAbsolutePath(absolutePathA))
 	if err := repo.PersistLocalResult(ctx, &remA, &mA2, hashes); err != nil {
 		t.Fatalf("rescan root A: %v", err)
 	}
@@ -339,15 +375,28 @@ func TestIntegration_PersistLocalResult_SymlinkMarked(t *testing.T) {
 
 	stamp := time.Now().Format("150405.000")
 	root := "/integ/links-" + stamp
-	rem := remote.NewLocalRemote("integ-host", root)
 
+	// Create location
+	hostname := "integ-host"
+	loc := location.LocalLocation(hostname)
+	if err := repo.EnsureLocation(ctx, &loc); err != nil {
+		t.Fatalf("EnsureLocation failed: %v", err)
+	}
+
+	rem := remote.NewLocalRemote(hostname, root)
+	rem.LocationId = loc.Id
+
+	absolutePath := filepath.Join(root, "link.txt")
 	m := object.NewMeta("link.txt", "link.txt", "application/octet-stream",
-		object.WithMetaSize(8), object.WithMetaSymlink(true), object.WithMetaScanRoot(root))
+		object.WithMetaSize(8),
+		object.WithMetaSymlink(true),
+		object.WithMetaScanRoot(root),
+		object.WithMetaLocationId(loc.Id),
+		object.WithMetaAbsolutePath(absolutePath))
 
 	defer func() {
-		_, _ = repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE object_meta_id = $1`, m.Id)
 		_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id = $1`, m.Id)
-		_, _ = repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, rem.Id)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM location WHERE id = $1`, loc.Id)
 	}()
 
 	// Symlinks are persisted without hashes
@@ -356,21 +405,17 @@ func TestIntegration_PersistLocalResult_SymlinkMarked(t *testing.T) {
 	}
 
 	var isSymlink bool
-	var scanRoot *string
 	var hashLinks int
 	err := repo.db.QueryRow(ctx,
-		`SELECT is_symlink, scan_root,
+		`SELECT is_symlink,
 		        (SELECT COUNT(*) FROM object_hash_junction WHERE object_meta_id = $1)
 		 FROM object_meta WHERE id = $1`, m.Id,
-	).Scan(&isSymlink, &scanRoot, &hashLinks)
+	).Scan(&isSymlink, &hashLinks)
 	if err != nil {
 		t.Fatalf("read back symlink row: %v", err)
 	}
 	if !isSymlink {
 		t.Fatalf("expected is_symlink=true")
-	}
-	if scanRoot == nil || *scanRoot != root {
-		t.Fatalf("expected scan_root %q, got %v", root, scanRoot)
 	}
 	if hashLinks != 0 {
 		t.Fatalf("expected no hash junctions for symlink, got %d", hashLinks)
@@ -501,8 +546,18 @@ func TestGetFilesByHashes_Empty(t *testing.T) {
 // Helper to write metadata with specific size
 func writeMetaWithSize(t *testing.T, ctx context.Context, repo *ObjectRepository, name, path, mime string, size int64) int {
 	t.Helper()
+	// Ensure location exists first
+	loc := location.RemoteLocation("test-remote")
+	loc.Persisted = false
+	err := repo.EnsureLocation(ctx, &loc)
+	if err != nil {
+		t.Fatalf("ensure location: %v", err)
+	}
+
 	m := object.NewMeta(name, path, mime)
 	m.Size = size
+	m.LocationId = loc.Id
+	m.AbsolutePath = path
 	if err := repo.WriteMeta(ctx, &m); err != nil {
 		t.Fatalf("WriteMeta failed: %v", err)
 	}

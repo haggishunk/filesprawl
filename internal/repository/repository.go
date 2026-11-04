@@ -305,9 +305,22 @@ func (r *ObjectRepository) WriteObjectRemoteJunction(ctx context.Context, orj *o
 }
 
 func (r *ObjectRepository) PersistResult(ctx context.Context, rem *remote.Remote, lri rclone.ListResponseItem, scanRoot string) error {
+	// Ensure location exists first
+	if rem.Location.Id == 0 {
+		if err := r.EnsureLocation(ctx, &rem.Location); err != nil {
+			return fmt.Errorf("failed to ensure location: %w", err)
+		}
+	}
+
+	// Build absolute path: remote_name:path for rclone files
+	absolutePath := rem.Location.Name + ":" + lri.Path
+
 	// get or set object meta
-	// Note: LocationId and AbsolutePath must be set on the Meta before calling this method
-	m := object.NewMeta(lri.Name, lri.Path, lri.MimeType, object.WithMetaSize(lri.Size), object.WithMetaScanRoot(scanRoot))
+	m := object.NewMeta(lri.Name, lri.Path, lri.MimeType,
+		object.WithMetaSize(lri.Size),
+		object.WithMetaScanRoot(scanRoot),
+		object.WithMetaLocationId(rem.Location.Id),
+		object.WithMetaAbsolutePath(absolutePath))
 	fmt.Printf("Found object meta: %s\n", m)
 	err := r.ReadMeta(ctx, &m)
 	if err != nil {
