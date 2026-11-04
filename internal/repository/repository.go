@@ -35,6 +35,7 @@ type FileRecord struct {
 	MimeType     string
 	Size         int64
 	LocationId   int
+	AbsolutePath string
 	LocationName string
 	LocationType string
 }
@@ -116,12 +117,12 @@ func (r *ObjectRepository) WriteMeta(ctx context.Context, m *object.Meta) error 
 	// Extract directory from path (everything before the last /)
 	// BasePath is already calculated in object.NewMeta using path.Dir()
 	statement := `
-		INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, is_symlink, location_id, object_directory)
+		INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, is_symlink, location_id, absolute_path)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id;
 	`
 
-	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.Size, m.IsSymlink, m.LocationId, m.BasePath)
+	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.Size, m.IsSymlink, m.LocationId, m.AbsolutePath)
 	err := row.Scan(&id)
 
 	if err != nil {
@@ -140,16 +141,17 @@ func (r *ObjectRepository) ReadMeta(ctx context.Context, m *object.Meta) error {
 	var size int64
 	var isSymlink bool
 	var locationId int
+	var absolutePath string
 
 	statement := `
-		SELECT id, object_size, is_symlink, location_id
+		SELECT id, object_size, is_symlink, location_id, COALESCE(absolute_path, '')
 		FROM object_meta
 		WHERE object_name = $1 AND object_path = $2 AND object_mime_type = $3
-		  AND location_id = $4;
+		  AND absolute_path IS NOT DISTINCT FROM NULLIF($4, '');
 	`
 
-	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.LocationId)
-	err := row.Scan(&id, &size, &isSymlink, &locationId)
+	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.AbsolutePath)
+	err := row.Scan(&id, &size, &isSymlink, &locationId, &absolutePath)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -165,6 +167,7 @@ func (r *ObjectRepository) ReadMeta(ctx context.Context, m *object.Meta) error {
 	m.Size = size
 	m.IsSymlink = isSymlink
 	m.LocationId = locationId
+	m.AbsolutePath = absolutePath
 	m.Persisted = true
 	return nil
 }
@@ -319,12 +322,8 @@ func (r *ObjectRepository) PersistResult(ctx context.Context, rem *remote.Remote
 	}
 
 	// get or set object meta
-	// For remotes, object_path is the path within the remote (lri.Path)
-	// LocationId is required field
-	m := object.NewMeta(lri.Name, lri.Path, lri.MimeType,
-		object.WithMetaSize(lri.Size),
-		object.WithMetaScanRoot(scanRoot),
-		object.WithMetaLocationId(rem.Location.Id))
+	// Note: LocationId and AbsolutePath must be set on the Meta before calling this method
+	m := object.NewMeta(lri.Name, lri.Path, lri.MimeType, object.WithMetaSize(lri.Size), object.WithMetaScanRoot(scanRoot))
 	fmt.Printf("Found object meta: %s\n", m)
 	err := r.ReadMeta(ctx, &m)
 	if err != nil {
@@ -571,7 +570,7 @@ func (r *ObjectRepository) FindDuplicatesWithinRemote(ctx context.Context, locat
 func (r *ObjectRepository) GetFilesByHash(ctx context.Context, hashValue, hashType string, minSize int64) ([]FileRecord, error) {
 	statement := `
 		SELECT om.id, om.object_name, om.object_path, om.object_mime_type, om.object_size,
-		       om.location_id, COALESCE(l.name, ''), COALESCE(l.type, '')
+		       om.location_id, om.absolute_path, COALESCE(l.name, ''), COALESCE(l.type, '')
 		FROM object_meta om
 		JOIN object_hash_junction ohj ON om.id = ohj.object_meta_id
 		JOIN object_hash oh ON ohj.object_hash_id = oh.id
@@ -590,7 +589,7 @@ func (r *ObjectRepository) GetFilesByHash(ctx context.Context, hashValue, hashTy
 	var records []FileRecord
 	for rows.Next() {
 		var f FileRecord
-		if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size, &f.LocationId, &f.LocationName, &f.LocationType); err != nil {
+		if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size, &f.LocationId, &f.AbsolutePath, &f.LocationName, &f.LocationType); err != nil {
 			return nil, fmt.Errorf("failed to scan file record: %w", err)
 		}
 		records = append(records, f)
@@ -637,7 +636,7 @@ func (r *ObjectRepository) GetFilesByHashes(ctx context.Context, hashes []HashTy
 		// Build the WHERE clause for this batch: (hash_value, hash_type) IN (...)
 		statement := `
 			SELECT om.id, om.object_name, om.object_path, om.object_mime_type, om.object_size,
-			       om.location_id, COALESCE(l.name, ''), COALESCE(l.type, ''),
+			       om.location_id, om.absolute_path, COALESCE(l.name, ''), COALESCE(l.type, ''),
 			       oh.hash_value, oh.hash_type::text
 			FROM object_meta om
 			JOIN object_hash_junction ohj ON om.id = ohj.object_meta_id
@@ -671,7 +670,7 @@ func (r *ObjectRepository) GetFilesByHashes(ctx context.Context, hashes []HashTy
 		for rows.Next() {
 			var f FileRecord
 			var hashValue, hashType string
-			if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size, &f.LocationId, &f.LocationName, &f.LocationType, &hashValue, &hashType); err != nil {
+			if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size, &f.LocationId, &f.AbsolutePath, &f.LocationName, &f.LocationType, &hashValue, &hashType); err != nil {
 				return nil, fmt.Errorf("failed to scan file record in batch: %w", err)
 			}
 			key := hashValue + ":" + hashType

@@ -125,12 +125,14 @@ func Scan(ctx context.Context, s *Scanner, lc rclone.ListConfig) error {
 		for _, lri := range lr.List {
 			fmt.Printf("Found file: %s\n", lri)
 
-			// Create Meta with LocationId set
-			// For remotes, object_path is the path within the remote
+			// Build Meta with LocationId and AbsolutePath set
+			// rclone absolute path format: remote_name:path
+			absolutePath := s.Remote.Name + ":" + lri.Path
 			meta := object.NewMeta(lri.Name, lri.Path, lri.MimeType,
 				object.WithMetaSize(lri.Size),
 				object.WithMetaScanRoot(s.ScanRoot),
-				object.WithMetaLocationId(s.Remote.LocationId))
+				object.WithMetaLocationId(s.Remote.LocationId),
+				object.WithMetaAbsolutePath(absolutePath))
 
 			// Persist meta and hashes
 			err := s.persistRcloneFile(ctx, &meta, lri.Hashes)

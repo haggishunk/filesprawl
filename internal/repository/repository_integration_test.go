@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -343,20 +342,19 @@ func TestIntegration_PersistLocalResult_ScanRootDeduplication(t *testing.T) {
 	if len(records) != 2 {
 		t.Fatalf("expected 2 records from two roots, got %d", len(records))
 	}
-	// Verify we got files from both roots by checking object paths
-	// (which now stores the absolute filesystem path for local files)
+	// Verify we got files from both roots by checking absolute paths
 	foundRootA := false
 	foundRootB := false
 	for _, r := range records {
-		if strings.HasPrefix(r.Path, rootA) {
+		if strings.HasPrefix(r.AbsolutePath, rootA) {
 			foundRootA = true
 		}
-		if strings.HasPrefix(r.Path, rootB) {
+		if strings.HasPrefix(r.AbsolutePath, rootB) {
 			foundRootB = true
 		}
 	}
 	if !foundRootA || !foundRootB {
-		t.Fatalf("expected paths from roots %s and %s, got %v", rootA, rootB, records)
+		t.Fatalf("expected absolute paths from roots %s and %s, got %v", rootA, rootB, records)
 	}
 
 	// Rescanning the same root reuses the existing record (idempotent)
@@ -567,12 +565,13 @@ func writeMetaWithSize(t *testing.T, ctx context.Context, repo *ObjectRepository
 	return m.Id
 }
 
-// Helper to write metadata with location_id (absolute_path parameter kept for compatibility)
-func writeMetaWithLocationAndPath(t *testing.T, ctx context.Context, repo *ObjectRepository, name, path, mime string, locationId int, _ string) int {
+// Helper to write metadata with location_id and absolute_path
+func writeMetaWithLocationAndPath(t *testing.T, ctx context.Context, repo *ObjectRepository, name, path, mime string, locationId int, absolutePath string) int {
 	t.Helper()
 	m := object.NewMeta(name, path, mime)
 	m.Size = 512
 	m.LocationId = locationId
+	m.AbsolutePath = absolutePath
 	if err := repo.WriteMeta(ctx, &m); err != nil {
 		t.Fatalf("WriteMeta failed: %v", err)
 	}
