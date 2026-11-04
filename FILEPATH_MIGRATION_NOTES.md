@@ -1,58 +1,67 @@
-# Filepath Storage & Display Migration
+# Filepath Storage & Display Schema
 
-## Current Database State
+## New Storage Design (Fixed)
 
-The database stores file paths split into:
+Local and rclone scans now use consistent, clean storage:
 
-- `remote.remote_name` = scan root (e.g., `/goblet/light`)
-- `object_meta.object_path` = relative path (e.g., `photos/travis-transfer/2019/03/10/IMG_0587.MOV`)
-- `object_meta.scan_root` = redundant copy of scan root
+**LOCAL SCANS:**
 
-## New Design Requirements
+- `location.name`: hostname (identifies machine)
+- `remote.remote_name`: hostname (identifies source)
+- `object_meta.object_path`: relative path (e.g., `photos/IMG_0587.MOV`)
+- `object_meta.scan_root`: scan directory (filter for incremental scans)
 
-The UI now expects:
+**RCLONE SCANS:**
 
-- **Local files**: `RemoteName` = full canonical path (scan_root + relative path)
-- **Rclone files**: `RemoteName` = remote identifier (e.g., `goblet`)
+- `location.name`: remote name (identifies storage)
+- `remote.remote_name`: remote name (identifies source)
+- `object_meta.object_path`: path within remote (e.g., `photos/IMG_0587.MOV`)
+- `object_meta.scan_root`: NULL (not applicable for remotes)
 
-## Migration Strategy
+## UI Display & File Access
 
-### Option 1: Re-Scan (Recommended)
+**LOCAL FILES:**
 
-Run scan again for all indexed locations:
+```
+Remote display:   archlinux
+Filepath display: /goblet/light/photos/IMG_0587.MOV
+File access:      Direct filesystem path
+```
+
+**RCLONE FILES:**
+
+```
+Remote display:   goblet
+Filepath display: photos/IMG_0587.MOV
+File access:      goblet:photos/IMG_0587.MOV
+```
+
+## Data Migration
+
+### For New Scans
+
+Automatically uses correct schema:
 
 ```bash
-filesprawl index --remote <name> --path <path>
+filesprawl index --remote archlinux --path /goblet/light
 ```
 
-This automatically stores correct data:
+### For Existing Data
 
-- `remote.remote_name` = full canonical path for local files
-- `object_meta.object_path` = relative path (unchanged)
-- `object_meta.scan_root` = scan root (for type detection)
+Optional cleanup and re-scan:
 
-### Option 2: Database Migration (Complex)
+```bash
+# Clear old data
+DELETE FROM object_meta WHERE scan_root = '/goblet/light';
+DELETE FROM remote WHERE remote_name = '/goblet/light';
 
-Compute full paths from existing data:
-
-```sql
-UPDATE remote
-SET remote_name = object_meta.scan_root || '/' || object_meta.object_path
-WHERE location.type = 'local'
+# Re-index
+filesprawl index --remote archlinux --path /goblet/light
 ```
 
-**Issue**: This requires joining tables and won't work if scan_root isn't set on all records.
+## Benefits
 
-## Recommendation
-
-**Re-scan all sources** to ensure data integrity and consistency. The UI has been updated to work with the correct data structure, but existing scans need to be re-indexed.
-
-## Current UI Behavior
-
-The UI code now:
-
-1. Detects file type using `scan_root` (local vs rclone)
-2. Displays `RemoteName` as the remote/hostname
-3. Constructs full paths for preview: `RemoteName/Path` (local) or `RemoteName:Path` (rclone)
-
-This assumes `RemoteName` is already the full canonical path for local files.
+- **Direct mapping**: No adapter layer needed
+- **Clean semantics**: Hostname = source identifier for local files
+- **Type detection**: `scan_root != NULL` indicates local file
+- **Flexible**: Can scan multiple roots from same machine
