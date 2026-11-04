@@ -13,11 +13,28 @@ local linters = new Mapping {
   ["pkl"] = Builtins.pkl
   ["pkl-format"] = Builtins.pkl_format
   ["prettier"] = (Builtins.prettier) {
-    exclude = List("*.yaml", ".github/workflows/*.yml")
+    exclude =
+      List(
+        "*.yaml",
+        ".github/workflows/*.yml",
+        ".github/workflows/*.yaml",
+      )
   }
-  ["ryl"] = Builtins.ryl
+  ["ryl"] = (Builtins.ryl) {
+    exclude =
+      List(
+        "docker-compose.yaml",
+        ".github/workflows/*.yml",
+        ".github/workflows/*.yaml",
+      )
+  }
   ["ryl-format"] = (Builtins.ryl_format) {
-    exclude = List("docker-compose.yaml")
+    exclude =
+      List(
+        "docker-compose.yaml",
+        ".github/workflows/*.yml",
+        ".github/workflows/*.yaml",
+      )
   }
   ["shellcheck"] = Builtins.shellcheck
   ["shellharden"] = Builtins.shellharden
