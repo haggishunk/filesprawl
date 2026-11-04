@@ -1,8 +1,9 @@
 [tools]
-actionlint = "latest"
-hk = "latest"
+"aqua:owenlamont/ryl" = "latest"
 "npm:dclint" = "latest"
 "npm:prettier" = "latest"
+actionlint = "latest"
+hk = "latest"
 shellcheck = "latest"
 shellharden = "latest"
 zizmor = "latest"

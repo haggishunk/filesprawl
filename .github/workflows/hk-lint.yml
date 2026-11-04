@@ -31,11 +31,6 @@ jobs:
         run: |
           curl -fsSL https://get.jetify.com/hk | bash
 
-      - name: Validate .ryl.toml against schema
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/owenlamont/ryl/refs/heads/main/ryl.toml.schema.json -o /tmp/ryl.schema.json
-          npx -y ajv-cli validate -s /tmp/ryl.schema.json -d .ryl.toml
-
       - name: Run hk pre-commit checks on changed files
         env:
           BASE_REF: ${{ github.base_ref }}
