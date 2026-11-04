@@ -183,10 +183,27 @@ func (tp *TablePane) renderFileLine(buf *strings.Builder, version browsing.FileV
 		}
 	}
 
+	filepath := ""
+	if version.FileInfo != nil {
+		filepath = version.FileInfo.Path
+		if len(filepath) > 20 {
+			filepath = filepath[:20]
+		}
+	}
+
 	size := formatSize(version.FileInfo.Size)
 
-	content := fmt.Sprintf("%s %s | %s | %s | %s",
-		prefix, remote, filename, size, flagStatus)
+	// Format based on wide view setting
+	var content string
+	if tp.wideView {
+		// Wide view: remote | filename | filepath | size (status always shown)
+		content = fmt.Sprintf("%s %s | %s | %s | %s",
+			prefix, remote, filename, filepath, size)
+	} else {
+		// Normal view: remote | filename | size | status
+		content = fmt.Sprintf("%s %s | %s | %s | %s",
+			prefix, remote, filename, size, flagStatus)
+	}
 
 	lineWidth := tp.width - 2
 	if len(content) > lineWidth {

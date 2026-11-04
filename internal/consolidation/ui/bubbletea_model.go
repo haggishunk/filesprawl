@@ -41,6 +41,7 @@ type ConsolidationModel struct {
 	banner        *components.Banner
 	statusBar     *components.StatusBar
 	safetyChecker *components.SafetyChecker
+	helpModal     *components.HelpModal
 
 	// UI feedback
 	lastError string // Last error message to display
@@ -78,6 +79,7 @@ func NewConsolidationModel(
 	model.banner = components.NewBanner(version, len(duplicateGroups), reviewMode, remotes, 80)
 	model.statusBar = components.NewStatusBar(80)
 	model.safetyChecker = components.NewSafetyChecker(flagManager)
+	model.helpModal = components.NewHelpModal(80, 24)
 
 	// Set initial group in table
 	if len(duplicateGroups) > 0 {
@@ -153,6 +155,15 @@ func (m *ConsolidationModel) View() string {
 
 	var result strings.Builder
 
+	// If help modal is open, show it instead of normal view
+	if m.modalType == "help" {
+		if m.helpModal != nil {
+			m.helpModal.Width = m.width
+			m.helpModal.Height = m.height
+			return m.helpModal.Render()
+		}
+	}
+
 	// Render banner
 	if m.banner != nil {
 		result.WriteString(m.banner.Render())
@@ -224,6 +235,15 @@ func (m *ConsolidationModel) combinePanels(leftPane, rightPane string) string {
 
 // handleKey processes keyboard input
 func (m *ConsolidationModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// If help modal is open, close it on any key (except q for quit)
+	if m.modalType == "help" {
+		if msg.String() != "q" {
+			m.modalType = ""
+			return m, nil
+		}
+		// q will fall through and quit below
+	}
+
 	switch msg.String() {
 	case "tab":
 		// Switch focus between panes
