@@ -31,6 +31,11 @@ jobs:
         run: |
           curl -fsSL https://get.jetify.com/hk | bash
 
+      - name: Validate .ryl.toml against schema
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/owenlamont/ryl/refs/heads/main/ryl.toml.schema.json -o /tmp/ryl.schema.json
+          npx -y ajv-cli validate -s /tmp/ryl.schema.json -d .ryl.toml
+
       - name: Run hk pre-commit checks on changed files
         env:
           BASE_REF: ${{ github.base_ref }}
@@ -45,4 +50,4 @@ jobs:
         if: failure()
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
-          body: "❌ hk pre-commit checks failed. Please run `hk run pre-commit --fix --all` locally and push the changes."
+          body: ❌ hk pre-commit checks failed. Please run `hk run pre-commit --fix --all` locally and push the changes.

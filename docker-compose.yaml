@@ -10,7 +10,7 @@ services:
       - PGADMIN_DEFAULT_EMAIL=admin@example.com
       - PGADMIN_DEFAULT_PASSWORD=adminpassword
     ports:
-      - "127.0.0.1:8080:80"
+      - '127.0.0.1:8080:80'
     networks:
       - postgres
   postgres:
@@ -23,7 +23,7 @@ services:
       POSTGRES_USER: sprawler
       POSTGRES_PASSWORD: test-only
     ports:
-      - "127.0.0.1:5432:5432"
+      - '127.0.0.1:5432:5432'
     networks:
       - postgres
 
@@ -35,7 +35,7 @@ services:
       PG_PASSWORD: test-only
     networks:
       - postgres
-    command: ["psql"]
+    command: [ psql ]
 
 networks:
   postgres: {}

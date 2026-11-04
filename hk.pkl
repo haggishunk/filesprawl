@@ -12,7 +12,9 @@ local linters = new Mapping {
   ["gomod_tidy"] = Builtins.gomod_tidy
   ["pkl"] = Builtins.pkl
   ["pkl-format"] = Builtins.pkl_format
-  ["prettier"] = Builtins.prettier
+  ["prettier"] = (Builtins.prettier) {
+    exclude = List("Dockerfile")
+  }
   ["shellcheck"] = Builtins.shellcheck
   ["shellharden"] = Builtins.shellharden
   ["shfmt"] = Builtins.shfmt
