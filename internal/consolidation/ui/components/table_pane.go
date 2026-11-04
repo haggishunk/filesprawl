@@ -178,12 +178,23 @@ func (tp *TablePane) renderFileLine(buf *strings.Builder, version browsing.FileV
 		}
 	}
 
-	// Truncate fields to fit
+	// Build remote identifier: hostname for local, remote name for rclone
 	remote := "?"
-	if version.FileInfo != nil && version.FileInfo.ScanRoot != "" {
-		remote = version.FileInfo.ScanRoot
-		if len(remote) > 6 {
-			remote = remote[:6]
+	isLocal := version.FileInfo != nil && version.FileInfo.ScanRoot != ""
+	if isLocal {
+		// Local file: show hostname
+		remote = version.Hostname
+		if remote == "" {
+			remote = "local"
+		}
+		if len(remote) > 10 {
+			remote = remote[:10]
+		}
+	} else {
+		// Rclone file: show remote name
+		remote = version.RemoteName
+		if len(remote) > 10 {
+			remote = remote[:10]
 		}
 	}
 
@@ -195,10 +206,27 @@ func (tp *TablePane) renderFileLine(buf *strings.Builder, version browsing.FileV
 		}
 	}
 
+	// Build filepath display
+	// Local: full canonical path (RemoteName + Path)
+	// Remote: path within remote (just Path after the : separator)
 	filepath := ""
 	if version.FileInfo != nil {
-		filepath = version.FileInfo.Path
-		// For wide view, give filepath more space - use 60% of available width
+		if isLocal {
+			// Local file: show full canonical path
+			if version.RemoteName != "" {
+				filepath = version.RemoteName
+				if version.FileInfo.Path != "" {
+					filepath = fmt.Sprintf("%s/%s", version.RemoteName, version.FileInfo.Path)
+				}
+			} else {
+				filepath = version.FileInfo.Path
+			}
+		} else {
+			// Rclone file: show path within remote (after the : separator)
+			filepath = version.FileInfo.Path
+		}
+
+		// Truncate for display
 		maxFilepathLen := (tp.width * 60) / 100
 		if maxFilepathLen < 20 {
 			maxFilepathLen = 20
