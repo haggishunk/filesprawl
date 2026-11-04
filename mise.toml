@@ -1,0 +1,11 @@
+[tools]
+actionlint = "latest"
+hk = "latest"
+"npm:dclint" = "latest"
+"npm:prettier" = "latest"
+shellcheck = "latest"
+shellharden = "latest"
+zizmor = "latest"
+
+[tasks.pre-commit]
+run = "hk run pre-commit"

@@ -3,15 +3,14 @@ name: release
 on:
   push:
     tags:
-      - 'v*'
-
-permissions:
-  contents: write
+      - "v*"
 
 jobs:
   build:
     name: build and publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       matrix:
         include:
@@ -27,25 +26,27 @@ jobs:
       VERSION: ${{ github.ref_name }}
       GOOS: ${{ matrix.goos }}
       GOARCH: ${{ matrix.goarch }}
-      CGO_ENABLED: '0'
+      CGO_ENABLED: "0"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
+          cache: false
 
       - name: Build
         run: |
           make build
-          mv build/filesprawl build/filesprawl-${GOOS}-${GOARCH}
+          mv build/filesprawl "build/filesprawl-${{ matrix.goos }}-${{ matrix.goarch }}"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: filesprawl-${{ matrix.goos }}-${{ matrix.goarch }}
           path: build/filesprawl-${{ matrix.goos }}-${{ matrix.goarch }}
@@ -54,9 +55,16 @@ jobs:
     name: publish release
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: dist
           merge-multiple: true
@@ -66,9 +74,11 @@ jobs:
         run: shasum -a 256 filesprawl-* > checksums.txt
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/filesprawl-*
-            dist/checksums.txt
-          generate_release_notes: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            dist/filesprawl-* \
+            dist/checksums.txt \
+            --generate-notes
