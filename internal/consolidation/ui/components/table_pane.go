@@ -56,6 +56,14 @@ func (tp *TablePane) ToggleWideView() {
 	tp.wideView = !tp.wideView
 }
 
+// GetSelectedFile returns the currently selected file version
+func (tp *TablePane) GetSelectedFile() *browsing.FileVersion {
+	if tp.group == nil || tp.selectedIndex < 0 || tp.selectedIndex >= len(tp.group.Versions) {
+		return nil
+	}
+	return &tp.group.Versions[tp.selectedIndex]
+}
+
 // SelectionUp moves selection up
 func (tp *TablePane) SelectionUp() {
 	if tp.group == nil {
@@ -104,7 +112,7 @@ func (tp *TablePane) Render() string {
 	if tp.focused {
 		headerChar = "═"
 	}
-	header := fmt.Sprintf("┌%s FILES IN GROUP %s┐\n", strings.Repeat(headerChar, 1), strings.Repeat(headerChar, 13))
+	header := fmt.Sprintf("┌%s FILES %s┐\n", strings.Repeat(headerChar, 1), strings.Repeat(headerChar, (tp.width-14)))
 	buf.WriteString(header)
 
 	// Column headers
@@ -113,7 +121,11 @@ func (tp *TablePane) Render() string {
 	} else {
 		buf.WriteString("│ remote | filename | size | status │\n")
 	}
-	buf.WriteString("├──────────────────────────────────┤\n")
+	separatorWidth := tp.width - 2
+	if separatorWidth < 5 {
+		separatorWidth = 5
+	}
+	fmt.Fprintf(&buf, "├%s┤\n", strings.Repeat("─", separatorWidth-2))
 
 	// Calculate available space
 	contentHeight := tp.height - 5
@@ -186,8 +198,13 @@ func (tp *TablePane) renderFileLine(buf *strings.Builder, version browsing.FileV
 	filepath := ""
 	if version.FileInfo != nil {
 		filepath = version.FileInfo.Path
-		if len(filepath) > 20 {
-			filepath = filepath[:20]
+		// For wide view, give filepath more space - use 60% of available width
+		maxFilepathLen := (tp.width * 60) / 100
+		if maxFilepathLen < 20 {
+			maxFilepathLen = 20
+		}
+		if len(filepath) > maxFilepathLen {
+			filepath = filepath[:maxFilepathLen]
 		}
 	}
 

@@ -100,9 +100,9 @@ func (sb *StatusBar) Render() string {
 	// Show keyboard shortcuts based on focused pane
 	var shortcuts string
 	if sb.focusedPane == "list" {
-		shortcuts = "[LIST] j/k: nav | Tab: switch | v: view | ?: help | q: quit"
+		shortcuts = "[LIST] j/k: nav | Tab: switch | ?: help | q: quit"
 	} else {
-		shortcuts = "[TABLE] j/k: nav | Tab: switch | v: wide | K/a/d/s: flag | ?: help | q: quit"
+		shortcuts = "[TABLE] j/k: nav | Tab: switch | w: wide | v: preview | K/a/d/s: flag | ?: help | q: quit"
 	}
 
 	// Summary on second line
