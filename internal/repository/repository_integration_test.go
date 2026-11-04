@@ -3,10 +3,12 @@ package repository
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/haggishunk/filesprawl/internal/database"
+	"github.com/haggishunk/filesprawl/internal/location"
 	"github.com/haggishunk/filesprawl/internal/object"
 	"github.com/haggishunk/filesprawl/internal/rclone"
 	"github.com/haggishunk/filesprawl/internal/remote"
@@ -189,14 +191,28 @@ func TestIntegration_GetFilesByHash_MinSizeFilter(t *testing.T) {
 	}
 }
 
-func TestIntegration_PersistResult_PersistsRemoteAssociations(t *testing.T) {
+// TestIntegration_PersistResult_PersistsMetaAndHashes tests that PersistResult
+// persists object metadata and hashes with location_id and absolute_path.
+// Note: This test now expects Meta to have LocationId and AbsolutePath pre-set;
+// remote associations are no longer created by PersistResult.
+func TestIntegration_PersistResult_PersistsMetaAndHashes(t *testing.T) {
 	pool := openTestDB(t)
 	repo := NewObjectRepository(database.NewPgxDatabase(pool))
 	ctx := context.Background()
 
 	stamp := time.Now().Format("150405.000")
-	remoteName := "integ_remote_" + stamp + ":"
-	rem := remote.NewRcloneRemote("integ_remote_host", remoteName)
+
+	// Create location first
+	loc := location.Location{
+		Name: "integ_location_" + stamp,
+		Type: "remote",
+	}
+	if err := repo.WriteLocation(ctx, &loc); err != nil {
+		t.Fatalf("WriteLocation failed: %v", err)
+	}
+
+	rem := remote.NewRcloneRemote(loc.Name, "integ_remote_"+stamp)
+	rem.LocationId = loc.Id
 
 	item1 := rclone.ListResponseItem{
 		Name:     "a.txt",
@@ -205,51 +221,29 @@ func TestIntegration_PersistResult_PersistsRemoteAssociations(t *testing.T) {
 		Size:     512,
 		Hashes:   map[string]string{"md5": "integ-remote-hash-a-" + stamp},
 	}
-	item2 := rclone.ListResponseItem{
-		Name:     "b.txt",
-		Path:     "/integ/" + stamp + "/b.txt",
-		MimeType: "text/plain",
-		Size:     512,
-		Hashes:   map[string]string{"md5": "integ-remote-hash-b-" + stamp},
-	}
 
 	defer func() {
-		_, _ = repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE remote_id = $1`, rem.Id)
-		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_meta_id IN (SELECT id FROM object_meta WHERE object_path = $1 OR object_path = $2)`, item1.Path, item2.Path)
-		_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE object_path = $1 OR object_path = $2`, item1.Path, item2.Path)
-		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE hash_value = $1 OR hash_value = $2`, item1.Hashes["md5"], item2.Hashes["md5"])
-		_, _ = repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, rem.Id)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_meta_id IN (SELECT id FROM object_meta WHERE object_path = $1)`, item1.Path)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE object_path = $1`, item1.Path)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE hash_value = $1`, item1.Hashes["md5"])
+		_, _ = repo.db.Exec(ctx, `DELETE FROM location WHERE id = $1`, loc.Id)
 	}()
 
 	if err := repo.PersistResult(ctx, &rem, item1, "/integ/"+stamp); err != nil {
-		t.Fatalf("PersistResult item1: %v", err)
-	}
-	if err := repo.PersistResult(ctx, &rem, item2, "/integ/"+stamp); err != nil {
-		t.Fatalf("PersistResult item2: %v", err)
+		t.Fatalf("PersistResult: %v", err)
 	}
 
-	var remoteCount int
+	// Verify hash was persisted
+	var hashCount int
 	err := repo.db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM remote WHERE remote_name = $1 AND location_id = $2`,
-		rem.Name, rem.LocationId,
-	).Scan(&remoteCount)
+		`SELECT COUNT(*) FROM object_hash WHERE hash_value = $1`,
+		item1.Hashes["md5"],
+	).Scan(&hashCount)
 	if err != nil {
-		t.Fatalf("count remote rows: %v", err)
+		t.Fatalf("count hash rows: %v", err)
 	}
-	if remoteCount != 1 {
-		t.Fatalf("expected 1 remote row, got %d", remoteCount)
-	}
-
-	var linkCount int
-	err = repo.db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM object_remote_junction WHERE remote_id = $1`,
-		rem.Id,
-	).Scan(&linkCount)
-	if err != nil {
-		t.Fatalf("count remote links: %v", err)
-	}
-	if linkCount != 2 {
-		t.Fatalf("expected 2 object_remote_junction rows, got %d", linkCount)
+	if hashCount != 1 {
+		t.Fatalf("expected 1 hash row, got %d", hashCount)
 	}
 }
 
@@ -305,17 +299,27 @@ func TestIntegration_PersistLocalResult_ScanRootDeduplication(t *testing.T) {
 		t.Fatalf("expected cross-root duplicate group for hash %s", hashVal)
 	}
 
-	// GetFilesByHash reports scan provenance
+	// GetFilesByHash returns files with location and absolute path information
 	records, err := repo.GetFilesByHash(ctx, hashVal, "md5", 0)
 	if err != nil {
 		t.Fatalf("get files by hash: %v", err)
 	}
-	roots := map[string]bool{}
-	for _, r := range records {
-		roots[r.ScanRoot] = true
+	if len(records) != 2 {
+		t.Fatalf("expected 2 records from two roots, got %d", len(records))
 	}
-	if !roots[rootA] || !roots[rootB] {
-		t.Fatalf("expected scan roots %s and %s in records, got %v", rootA, rootB, roots)
+	// Verify we got files from both roots by checking absolute paths
+	foundRootA := false
+	foundRootB := false
+	for _, r := range records {
+		if strings.HasPrefix(r.AbsolutePath, rootA) {
+			foundRootA = true
+		}
+		if strings.HasPrefix(r.AbsolutePath, rootB) {
+			foundRootB = true
+		}
+	}
+	if !foundRootA || !foundRootB {
+		t.Fatalf("expected absolute paths from roots %s and %s, got %v", rootA, rootB, records)
 	}
 
 	// Rescanning the same root reuses the existing record (idempotent)
@@ -505,94 +509,87 @@ func writeMetaWithSize(t *testing.T, ctx context.Context, repo *ObjectRepository
 	return m.Id
 }
 
-// TestFindDuplicatesWithinRemote_WithHostnamePrefix tests Issue #7 fix:
-// FindDuplicatesWithinRemote should accept both "remote_name" and "location_name/remote_name" formats.
-func TestFindDuplicatesWithinRemote_WithHostnamePrefix(t *testing.T) {
+// Helper to write metadata with location_id and absolute_path
+func writeMetaWithLocationAndPath(t *testing.T, ctx context.Context, repo *ObjectRepository, name, path, mime string, locationId int, absolutePath string) int {
+	t.Helper()
+	m := object.NewMeta(name, path, mime)
+	m.Size = 512
+	m.LocationId = locationId
+	m.AbsolutePath = absolutePath
+	if err := repo.WriteMeta(ctx, &m); err != nil {
+		t.Fatalf("WriteMeta failed: %v", err)
+	}
+	return m.Id
+}
+
+// TestFindDuplicatesWithinRemote_ByLocationName tests that FindDuplicatesWithinRemote
+// finds duplicates by looking up location by name.
+func TestFindDuplicatesWithinRemote_ByLocationName(t *testing.T) {
 	pool := openTestDB(t)
 	repo := NewObjectRepository(database.NewPgxDatabase(pool))
 	ctx := context.Background()
 
-	// Create a remote (rclone remote)
-	locationName := "testhost"
-	remName := "testremote"
-	rem := remote.NewRcloneRemote(locationName, remName)
-	if err := repo.WriteRemote(ctx, &rem); err != nil {
-		t.Fatalf("WriteRemote failed: %v", err)
+	// Create a location
+	stamp := time.Now().Format("150405.000")
+	locationName := "testloc_" + stamp
+	loc := location.Location{
+		Name: locationName,
+		Type: "remote",
 	}
-	remID := rem.Id
+	if err := repo.WriteLocation(ctx, &loc); err != nil {
+		t.Fatalf("WriteLocation failed: %v", err)
+	}
 
-	// Create duplicate files and associate with remote
-	hash := writeRaw(t, ctx, repo, "dup_hash_with_host", "md5")
-	meta1 := writeMetaRaw(t, ctx, repo, "file1.txt", "/path/file1.txt", "text/plain")
-	meta2 := writeMetaRaw(t, ctx, repo, "file2.txt", "/path/file2.txt", "text/plain")
+	// Create duplicate files with location_id
+	hash := writeRaw(t, ctx, repo, "dup_hash_"+stamp, "md5")
+	meta1 := writeMetaWithLocationAndPath(t, ctx, repo, "file1.txt", "/path/file1.txt", "text/plain", loc.Id, "/path/file1.txt")
+	meta2 := writeMetaWithLocationAndPath(t, ctx, repo, "file2.txt", "/path/file2.txt", "text/plain", loc.Id, "/path/file2.txt")
 	writeJunctionRaw(t, ctx, repo, meta1, hash)
 	writeJunctionRaw(t, ctx, repo, meta2, hash)
 
-	// Link metadata to remote
-	if _, err := repo.db.Exec(ctx, `INSERT INTO object_remote_junction (object_meta_id, remote_id) VALUES ($1, $2), ($3, $2)`, meta1, remID, meta2); err != nil {
-		t.Fatalf("failed to link metadata to remote: %v", err)
-	}
-
-	// Test 1: Query with "location_name/remote_name" format (as shown in report)
-	groups1, err := repo.FindDuplicatesWithinRemote(ctx, locationName+"/"+remName, "", 0, 0)
+	// Test finding duplicates by location name
+	groups, err := repo.FindDuplicatesWithinRemote(ctx, locationName, "", 0, 0)
 	if err != nil {
-		t.Fatalf("FindDuplicatesWithinRemote with hostname/name failed: %v", err)
+		t.Fatalf("FindDuplicatesWithinRemote failed: %v", err)
 	}
-	if len(groups1) == 0 {
-		t.Errorf("expected duplicates with hostname/name format, got none")
-	}
-
-	// Test 2: Query with just "remote_name" format (traditional)
-	groups2, err := repo.FindDuplicatesWithinRemote(ctx, remName, "", 0, 0)
-	if err != nil {
-		t.Fatalf("FindDuplicatesWithinRemote with name only failed: %v", err)
-	}
-	if len(groups2) == 0 {
-		t.Errorf("expected duplicates with name-only format, got none")
-	}
-
-	// Both queries should return the same results
-	if len(groups1) != len(groups2) {
-		t.Errorf("different results for same remote: hostname/name got %d, name-only got %d", len(groups1), len(groups2))
+	if len(groups) == 0 {
+		t.Errorf("expected duplicates, got none")
 	}
 
 	// Cleanup
-	_, _ = repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE remote_id = $1`, remID)
 	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id = $1`, hash)
 	_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2)`, meta1, meta2)
 	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
-	_, _ = repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, remID)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM location WHERE id = $1`, loc.Id)
 }
 
-// TestFindDuplicatesWithinRemote_HostnameInNameWithSlash tests edge case:
-// If a remote name contains "/" it should be parsed correctly.
-func TestFindDuplicatesWithinRemote_HostnamePrefixedPath(t *testing.T) {
+// TestFindDuplicatesWithinRemote_LocalLocation tests finding duplicates within
+// a local location with slash in the location name.
+func TestFindDuplicatesWithinRemote_LocalLocation(t *testing.T) {
 	pool := openTestDB(t)
 	repo := NewObjectRepository(database.NewPgxDatabase(pool))
 	ctx := context.Background()
 
-	// Create a remote representing a local scan path
-	host := "archlinux"
-	remName := "/tmp/fs-test.xyz/light" // Local scan path
-	rem := remote.NewLocalRemote(host, remName)
-	if err := repo.WriteRemote(ctx, &rem); err != nil {
-		t.Fatalf("WriteRemote failed: %v", err)
+	// Create a local location
+	stamp := time.Now().Format("150405.000")
+	locationName := "localhost_" + stamp
+	loc := location.Location{
+		Name: locationName,
+		Type: "local",
 	}
-	remID := rem.Id
+	if err := repo.WriteLocation(ctx, &loc); err != nil {
+		t.Fatalf("WriteLocation failed: %v", err)
+	}
 
-	// Create duplicates
-	hash := writeRaw(t, ctx, repo, "path_hash", "sha256")
-	meta1 := writeMetaRaw(t, ctx, repo, "doc.txt", "/doc.txt", "text/plain")
-	meta2 := writeMetaRaw(t, ctx, repo, "doc.txt", "/backup/doc.txt", "text/plain")
+	// Create duplicates with location_id
+	hash := writeRaw(t, ctx, repo, "local_path_hash_"+stamp, "sha256")
+	meta1 := writeMetaWithLocationAndPath(t, ctx, repo, "doc.txt", "/doc.txt", "text/plain", loc.Id, "/tmp/scan/doc.txt")
+	meta2 := writeMetaWithLocationAndPath(t, ctx, repo, "doc.txt", "/backup/doc.txt", "text/plain", loc.Id, "/tmp/backup/doc.txt")
 	writeJunctionRaw(t, ctx, repo, meta1, hash)
 	writeJunctionRaw(t, ctx, repo, meta2, hash)
 
-	if _, err := repo.db.Exec(ctx, `INSERT INTO object_remote_junction (object_meta_id, remote_id) VALUES ($1, $2), ($3, $2)`, meta1, remID, meta2); err != nil {
-		t.Fatalf("failed to link metadata: %v", err)
-	}
-
-	// Query with full "hostname/remote_name" format (as it appears in report)
-	groups, err := repo.FindDuplicatesWithinRemote(ctx, host+"/"+remName, "", 0, 0)
+	// Query by location name
+	groups, err := repo.FindDuplicatesWithinRemote(ctx, locationName, "", 0, 0)
 	if err != nil {
 		t.Fatalf("FindDuplicatesWithinRemote failed: %v", err)
 	}
@@ -601,9 +598,8 @@ func TestFindDuplicatesWithinRemote_HostnamePrefixedPath(t *testing.T) {
 	}
 
 	// Cleanup
-	_, _ = repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE remote_id = $1`, remID)
 	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id = $1`, hash)
 	_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2)`, meta1, meta2)
 	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
-	_, _ = repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, remID)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM location WHERE id = $1`, loc.Id)
 }

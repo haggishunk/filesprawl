@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/haggishunk/filesprawl/internal/location"
 	"github.com/haggishunk/filesprawl/internal/object"
 	"github.com/haggishunk/filesprawl/internal/remote"
 	"github.com/haggishunk/filesprawl/internal/repository"
@@ -20,6 +21,7 @@ import (
 // relies on. It allows tests to substitute a fake.
 type localPersister interface {
 	PersistLocalResult(ctx context.Context, rem *remote.Remote, m *object.Meta, hashes map[string]string) error
+	EnsureLocation(ctx context.Context, loc *location.Location) error
 }
 
 // LocalScanner walks the local filesystem and computes hashes
@@ -120,12 +122,29 @@ func persistLocalFile(ctx context.Context, ls *LocalScanner, scanRoot string, fi
 		return fmt.Errorf("failed to hash file %s: %w", filePath, err)
 	}
 
-	// Create metadata object
+	// Get hostname for location
+	hostname, err := os.Hostname()
+	if err != nil {
+		return fmt.Errorf("failed to get hostname: %w", err)
+	}
+
+	// Ensure location exists (hostname identifies local machine)
+	loc := location.LocalLocation(hostname)
+	if err := ls.Repo.EnsureLocation(ctx, &loc); err != nil {
+		return fmt.Errorf("failed to ensure location: %w", err)
+	}
+
+	// Build absolute path: scanRoot + "/" + relPath
+	absolutePath := filepath.Join(scanRoot, relPath)
+
+	// Create metadata object with new schema fields
 	meta := object.NewMeta(info.Name(), relPath, "application/octet-stream",
 		object.WithMetaSize(info.Size()),
-		object.WithMetaScanRoot(scanRoot))
+		object.WithMetaScanRoot(scanRoot),
+		object.WithMetaLocationId(loc.Id),
+		object.WithMetaAbsolutePath(absolutePath))
 
-	// Create local remote
+	// Create local remote (kept for hash junction compatibility)
 	rem, err := localRemote(scanRoot)
 	if err != nil {
 		return err
@@ -154,10 +173,27 @@ func persistLocalSymlink(ctx context.Context, ls *LocalScanner, scanRoot string,
 		return fmt.Errorf("failed to lstat symlink %s: %w", filePath, err)
 	}
 
+	// Get hostname for location
+	hostname, err := os.Hostname()
+	if err != nil {
+		return fmt.Errorf("failed to get hostname: %w", err)
+	}
+
+	// Ensure location exists (hostname identifies local machine)
+	loc := location.LocalLocation(hostname)
+	if err := ls.Repo.EnsureLocation(ctx, &loc); err != nil {
+		return fmt.Errorf("failed to ensure location: %w", err)
+	}
+
+	// Build absolute path: scanRoot + "/" + relPath
+	absolutePath := filepath.Join(scanRoot, relPath)
+
 	meta := object.NewMeta(info.Name(), relPath, "application/octet-stream",
 		object.WithMetaSize(info.Size()),
 		object.WithMetaSymlink(true),
-		object.WithMetaScanRoot(scanRoot))
+		object.WithMetaScanRoot(scanRoot),
+		object.WithMetaLocationId(loc.Id),
+		object.WithMetaAbsolutePath(absolutePath))
 
 	rem, err := localRemote(scanRoot)
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/haggishunk/filesprawl/internal/location"
 	"github.com/haggishunk/filesprawl/internal/object"
 	"github.com/haggishunk/filesprawl/internal/remote"
 )
@@ -118,6 +119,15 @@ type fakeLocalPersister struct {
 
 func (f *fakeLocalPersister) PersistLocalResult(_ context.Context, rem *remote.Remote, m *object.Meta, hashes map[string]string) error {
 	f.calls = append(f.calls, recordedLocalPersist{rem: *rem, meta: *m, hashes: hashes})
+	return nil
+}
+
+func (f *fakeLocalPersister) EnsureLocation(_ context.Context, loc *location.Location) error {
+	// Fake implementation: just set an ID if not already set
+	if loc.Id == 0 {
+		loc.Id = 1
+	}
+	loc.Persisted = true
 	return nil
 }
 
@@ -270,7 +280,12 @@ func TestScanLocalScanRootTracking(t *testing.T) {
 	if call.meta.Path != "file.txt" {
 		t.Fatalf("expected path relative to scan root, got %q", call.meta.Path)
 	}
-	if call.rem.Name != want || !call.rem.Location.IsLocal() {
-		t.Fatalf("expected local remote named %q, got %q", want, call.rem.Name)
+	// With new schema, remote name is hostname, not scan root path
+	hostname, err := os.Hostname()
+	if err != nil {
+		t.Fatalf("failed to get hostname: %v", err)
+	}
+	if call.rem.Name != hostname || !call.rem.Location.IsLocal() {
+		t.Fatalf("expected local remote named (hostname) %q, got %q", hostname, call.rem.Name)
 	}
 }
