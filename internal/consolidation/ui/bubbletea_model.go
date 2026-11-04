@@ -3,9 +3,11 @@ package ui
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/haggishunk/filesprawl/internal/consolidation/browsing"
+	"github.com/haggishunk/filesprawl/internal/consolidation/ui/components"
 )
 
 // ConsolidationModel implements tea.Model for the consolidation TUI
@@ -31,6 +33,12 @@ type ConsolidationModel struct {
 
 	// Data
 	duplicateGroups []browsing.DuplicateGroup
+
+	// Components
+	listPane  *components.ListPane
+	tablePane *components.TablePane
+	banner    *components.Banner
+	statusBar *components.StatusBar
 }
 
 // NewConsolidationModel creates a new Bubble Tea model
@@ -43,7 +51,7 @@ func NewConsolidationModel(
 	reviewMode bool,
 	remotes []string,
 ) *ConsolidationModel {
-	return &ConsolidationModel{
+	model := &ConsolidationModel{
 		ctx:             ctx,
 		sessionManager:  sessionManager,
 		flagManager:     flagManager,
@@ -57,6 +65,19 @@ func NewConsolidationModel(
 		reviewMode:      reviewMode,
 		remotes:         remotes,
 	}
+
+	// Initialize components
+	model.listPane = components.NewListPane(duplicateGroups, 40, 20)
+	model.tablePane = components.NewTablePane(60, 20, flagManager)
+	model.banner = components.NewBanner(version, len(duplicateGroups), reviewMode, remotes, 80)
+	model.statusBar = components.NewStatusBar(80)
+
+	// Set initial group in table
+	if len(duplicateGroups) > 0 {
+		model.tablePane.SetGroup(&duplicateGroups[0])
+	}
+
+	return model
 }
 
 // Init initializes the model
@@ -72,6 +93,22 @@ func (m *ConsolidationModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		// Update component dimensions (40% left, 60% right)
+		leftWidth := (m.width * 40) / 100
+		rightWidth := m.width - leftWidth - 2 // Account for borders
+		panelHeight := m.height - 4
+		if m.listPane != nil {
+			m.listPane.SetDimensions(leftWidth, panelHeight)
+		}
+		if m.tablePane != nil {
+			m.tablePane.SetDimensions(rightWidth, panelHeight)
+		}
+		if m.banner != nil {
+			m.banner.SetDimensions(m.width)
+		}
+		if m.statusBar != nil {
+			m.statusBar.SetDimensions(m.width)
+		}
 		return m, nil
 
 	case tea.KeyMsg:
@@ -107,18 +144,61 @@ func (m *ConsolidationModel) View() string {
 		return "Waiting for terminal...\n"
 	}
 
-	// For now, return a placeholder that shows the model is working
-	view := fmt.Sprintf("📎 Filesprawl v%s | Groups: %d | Mode: ",
-		m.version, len(m.duplicateGroups))
-	if m.reviewMode {
-		view += "REVIEW"
-	} else {
-		view += "EXECUTE"
-	}
-	view += " | Remotes: " + fmt.Sprint(m.remotes) + "\n"
-	view += "Keyboard: [j]down [k]up [v]view [K]keep [a]archive [d]delete [s]skip [?]help [q]quit\n"
+	var result strings.Builder
 
-	return view
+	// Render banner
+	if m.banner != nil {
+		result.WriteString(m.banner.Render())
+	}
+
+	// Render panes side-by-side
+	var listView, tableView string
+	if m.listPane != nil {
+		listView = m.listPane.Render()
+	}
+	if m.tablePane != nil {
+		tableView = m.tablePane.Render()
+	}
+
+	// Combine panes horizontally
+	panelsView := m.combinePanels(listView, tableView)
+	result.WriteString(panelsView)
+
+	// Render status bar
+	if m.statusBar != nil {
+		result.WriteString(m.statusBar.Render())
+	}
+
+	return result.String()
+}
+
+// combinePanels combines two pane views side-by-side
+func (m *ConsolidationModel) combinePanels(leftPane, rightPane string) string {
+	leftLines := strings.Split(leftPane, "\n")
+	rightLines := strings.Split(rightPane, "\n")
+
+	maxLines := len(leftLines)
+	if len(rightLines) > maxLines {
+		maxLines = len(rightLines)
+	}
+
+	var result strings.Builder
+	for i := 0; i < maxLines; i++ {
+		leftLine := ""
+		if i < len(leftLines) {
+			leftLine = leftLines[i]
+		}
+		rightLine := ""
+		if i < len(rightLines) {
+			rightLine = rightLines[i]
+		}
+
+		result.WriteString(leftLine)
+		result.WriteString(rightLine)
+		result.WriteString("\n")
+	}
+
+	return result.String()
 }
 
 // handleKey processes keyboard input
@@ -126,10 +206,17 @@ func (m *ConsolidationModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "j":
 		m.handleScroll("down")
+		// Update table pane when selection changes
+		m.updateTablePane()
 	case "k":
 		m.handleScroll("up")
+		// Update table pane when selection changes
+		m.updateTablePane()
 	case "v":
-		m.isHashView = !m.isHashView
+		// Toggle wide view in table pane
+		if m.tablePane != nil {
+			m.tablePane.ToggleWideView()
+		}
 	case "K":
 		m.handleAction("keep")
 	case "a":
@@ -148,12 +235,26 @@ func (m *ConsolidationModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// updateTablePane updates the table pane with the currently selected group
+func (m *ConsolidationModel) updateTablePane() {
+	if m.listPane != nil && m.tablePane != nil {
+		selectedGroup := m.listPane.GetSelectedGroup()
+		if selectedGroup != nil {
+			m.tablePane.SetGroup(selectedGroup)
+		}
+	}
+}
+
 // handleScroll moves selection up/down
 func (m *ConsolidationModel) handleScroll(direction string) {
-	if direction == "down" && m.selectedIndex < len(m.duplicateGroups)-1 {
-		m.selectedIndex++
-	} else if direction == "up" && m.selectedIndex > 0 {
-		m.selectedIndex--
+	if m.listPane != nil {
+		switch direction {
+		case "down":
+			m.listPane.SelectionDown()
+		case "up":
+			m.listPane.SelectionUp()
+		}
+		m.selectedIndex = m.listPane.GetSelectedIndex()
 	}
 }
 
