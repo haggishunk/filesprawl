@@ -6,8 +6,8 @@ import (
 
 // ViewController manages view rendering and switching
 type ViewController struct {
-	session         *SessionManager
-	hashRenderer    *HashViewRenderer
+	session          *SessionManager
+	hashRenderer     *HashViewRenderer
 	filenameRenderer *FilenameViewRenderer
 	presenceAnalyzer *PresenceAnalyzer
 }

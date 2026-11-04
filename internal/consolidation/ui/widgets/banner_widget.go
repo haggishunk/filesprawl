@@ -8,12 +8,12 @@ import (
 
 // BannerInfo holds information to display in the banner
 type BannerInfo struct {
-	Version       string
-	ReviewMode    bool
-	ExecuteMode   bool
-	Remotes       []string
+	Version         string
+	ReviewMode      bool
+	ExecuteMode     bool
+	Remotes         []string
 	TotalDuplicates int
-	FlaggedCount   int
+	FlaggedCount    int
 }
 
 // BannerWidget displays a top banner with essential information
@@ -28,11 +28,11 @@ func NewBannerWidget(info *BannerInfo) *BannerWidget {
 		paragraph: widgets.NewParagraph(),
 		info:      info,
 	}
-	
+
 	if widget.paragraph != nil {
 		widget.updateBannerText()
 	}
-	
+
 	return widget
 }
 
@@ -63,7 +63,7 @@ func (w *BannerWidget) updateBannerText() {
 	}
 
 	// Status summary
-	statusStr := fmt.Sprintf("Duplicates: %d | Flagged: %d", 
+	statusStr := fmt.Sprintf("Duplicates: %d | Flagged: %d",
 		w.info.TotalDuplicates, w.info.FlaggedCount)
 
 	// Build banner text

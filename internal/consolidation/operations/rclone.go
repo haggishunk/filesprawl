@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rclone/rclone/fs/rc"
 	"github.com/haggishunk/filesprawl/internal/rclone"
+	"github.com/rclone/rclone/fs/rc"
 )
 
 // Archive copies a file to an archive destination
@@ -39,9 +39,9 @@ func (re *RcloneExecutor) Archive(ctx context.Context, file ConsolidationFile, d
 
 	// Call rclone rc copyfile operation
 	params := rc.Params{
-		"srcFs":  fmt.Sprintf("%s:", file.Remote),
+		"srcFs":     fmt.Sprintf("%s:", file.Remote),
 		"srcRemote": file.Path,
-		"dstFs":  fmt.Sprintf("%s:", destRemote),
+		"dstFs":     fmt.Sprintf("%s:", destRemote),
 		"dstRemote": fullDest,
 	}
 
@@ -111,9 +111,9 @@ func (re *RcloneExecutor) Move(ctx context.Context, file ConsolidationFile, dest
 
 	// Call rclone rc movefile operation
 	params := rc.Params{
-		"srcFs":  fmt.Sprintf("%s:", file.Remote),
+		"srcFs":     fmt.Sprintf("%s:", file.Remote),
 		"srcRemote": file.Path,
-		"dstFs":  fmt.Sprintf("%s:", destRemote),
+		"dstFs":     fmt.Sprintf("%s:", destRemote),
 		"dstRemote": destPath,
 	}
 

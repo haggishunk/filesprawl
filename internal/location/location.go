@@ -28,11 +28,11 @@ func NewLocation(name, locationType string, options ...LocationOption) Location 
 		Type:      locationType,
 		Persisted: false,
 	}
-	
+
 	for _, opt := range options {
 		opt(&loc)
 	}
-	
+
 	return loc
 }
 

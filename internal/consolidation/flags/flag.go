@@ -14,7 +14,7 @@ import (
 type FlagType string
 
 const (
-	FlagTypeKeep   FlagType = "KEEP"
+	FlagTypeKeep    FlagType = "KEEP"
 	FlagTypeArchive FlagType = "ARCHIVE"
 	FlagTypeDelete  FlagType = "DELETE"
 )
@@ -47,28 +47,28 @@ type Review struct {
 type Repository interface {
 	// CreateFlag stores a new flag decision
 	CreateFlag(ctx context.Context, fileID int, userID int, flagType FlagType, reason *string, archiveDest *string) (*Flag, error)
-	
+
 	// GetFlag retrieves a flag by ID
 	GetFlag(ctx context.Context, id int) (*Flag, error)
-	
+
 	// GetFlagsByFile retrieves all flags for a file
 	GetFlagsByFile(ctx context.Context, fileID int) ([]Flag, error)
-	
+
 	// GetFlagsByUser retrieves all flags created by a user
 	GetFlagsByUser(ctx context.Context, userID int) ([]Flag, error)
-	
+
 	// UpdateFlag updates a flag decision
 	UpdateFlag(ctx context.Context, flagID int, flagType FlagType, reason *string, archiveDest *string) (*Flag, error)
-	
+
 	// DeleteFlag removes a flag
 	DeleteFlag(ctx context.Context, flagID int) error
-	
+
 	// CreateReview stores a review of a flag decision
 	CreateReview(ctx context.Context, fileID int, originalFlag *FlagType, originalUser *int, originalAt *time.Time, reviewedBy int, newFlag *FlagType, reviewReason *string) (*Review, error)
-	
+
 	// GetReviewsByFile retrieves all reviews for a file
 	GetReviewsByFile(ctx context.Context, fileID int) ([]Review, error)
-	
+
 	// GetReviewsByUser retrieves all reviews made by a user
 	GetReviewsByUser(ctx context.Context, userID int) ([]Review, error)
 }

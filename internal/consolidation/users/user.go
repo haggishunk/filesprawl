@@ -22,19 +22,19 @@ type User struct {
 type Repository interface {
 	// CreateUser creates a new user and returns the user ID
 	CreateUser(ctx context.Context, username string) (*User, error)
-	
+
 	// GetUser retrieves a user by ID
 	GetUser(ctx context.Context, id int) (*User, error)
-	
+
 	// GetUserByUsername retrieves a user by username
 	GetUserByUsername(ctx context.Context, username string) (*User, error)
-	
+
 	// ListUsers returns all users in the database
 	ListUsers(ctx context.Context) ([]User, error)
-	
+
 	// UpdateLastActive updates the last_active timestamp for a user
 	UpdateLastActive(ctx context.Context, userID int) error
-	
+
 	// UserExists checks if a user with the given username exists
 	UserExists(ctx context.Context, username string) (bool, error)
 }

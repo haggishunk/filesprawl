@@ -4,7 +4,7 @@ import "testing"
 
 func TestNewLocation(t *testing.T) {
 	loc := NewLocation("archlinux", "local")
-	
+
 	if loc.Id != -1 {
 		t.Errorf("expected id -1, got %d", loc.Id)
 	}
@@ -21,7 +21,7 @@ func TestNewLocation(t *testing.T) {
 
 func TestLocalLocation(t *testing.T) {
 	loc := LocalLocation("host1")
-	
+
 	if loc.Name != "host1" {
 		t.Errorf("expected name host1, got %s", loc.Name)
 	}
@@ -38,7 +38,7 @@ func TestLocalLocation(t *testing.T) {
 
 func TestRemoteLocation(t *testing.T) {
 	loc := RemoteLocation("dropbox")
-	
+
 	if loc.Name != "dropbox" {
 		t.Errorf("expected name dropbox, got %s", loc.Name)
 	}
@@ -55,7 +55,7 @@ func TestRemoteLocation(t *testing.T) {
 
 func TestNewLocationWithOptions(t *testing.T) {
 	loc := NewLocation("host1", "local", WithLocationID(42))
-	
+
 	if loc.Id != 42 {
 		t.Errorf("expected id 42, got %d", loc.Id)
 	}

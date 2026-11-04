@@ -9,7 +9,7 @@ import (
 
 // StatusWidget displays real-time status and instructions
 type StatusWidget struct {
-	paragraph *widgets.Paragraph
+	paragraph           *widgets.Paragraph
 	x, y, width, height int
 }
 

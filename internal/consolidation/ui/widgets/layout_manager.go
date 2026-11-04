@@ -4,11 +4,11 @@ package widgets
 type LayoutManager struct {
 	maxX         int
 	maxY         int
-	leftPaneW    int  // ~40% for list
-	bannerH      int  // 1 line for banner
-	statusH      int  // 3 lines for status
-	dividerX     int  // right border of left pane
-	detailsPaneX int  // start of right pane
+	leftPaneW    int // ~40% for list
+	bannerH      int // 1 line for banner
+	statusH      int // 3 lines for status
+	dividerX     int // right border of left pane
+	detailsPaneX int // start of right pane
 }
 
 // NewLayoutManager creates a layout manager for terminal dimensions
@@ -19,11 +19,11 @@ func NewLayoutManager(maxX, maxY int) *LayoutManager {
 	}
 
 	lm := &LayoutManager{
-		maxX:     maxX,
-		maxY:     maxY,
+		maxX:      maxX,
+		maxY:      maxY,
 		leftPaneW: maxX * 40 / 100, // 40% width
-		bannerH:  1,                // Banner takes 1 line
-		statusH:  3,                // Status bar height
+		bannerH:   1,               // Banner takes 1 line
+		statusH:   3,               // Status bar height
 	}
 
 	// Adjust for odd terminal widths

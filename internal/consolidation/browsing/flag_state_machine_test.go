@@ -36,4 +36,3 @@ func TestCanTransitionTo(t *testing.T) {
 		t.Errorf("expected DELETE transition to be allowed")
 	}
 }
-

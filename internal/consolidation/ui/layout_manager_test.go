@@ -23,7 +23,7 @@ func TestLayoutManagerMinSize(t *testing.T) {
 func TestGetListPaneRect(t *testing.T) {
 	lm := NewLayoutManager(100, 30)
 	x, y, w, h := lm.GetListPaneRect()
-	
+
 	if x != 0 || y != 0 {
 		t.Errorf("expected origin (0, 0), got (%d, %d)", x, y)
 	}
@@ -38,7 +38,7 @@ func TestGetListPaneRect(t *testing.T) {
 func TestGetDetailsPaneRect(t *testing.T) {
 	lm := NewLayoutManager(100, 30)
 	x, y, w, h := lm.GetDetailsPaneRect()
-	
+
 	if x <= 0 {
 		t.Errorf("expected positive x, got %d", x)
 	}
@@ -56,7 +56,7 @@ func TestGetDetailsPaneRect(t *testing.T) {
 func TestGetStatusBarRect(t *testing.T) {
 	lm := NewLayoutManager(100, 30)
 	x, y, w, h := lm.GetStatusBarRect()
-	
+
 	if x != 0 {
 		t.Errorf("expected x=0, got %d", x)
 	}
@@ -74,10 +74,10 @@ func TestGetStatusBarRect(t *testing.T) {
 func TestLayoutManagerUpdateSize(t *testing.T) {
 	lm := NewLayoutManager(100, 30)
 	oldW := lm.leftPaneW
-	
+
 	lm.UpdateSize(200, 50)
 	newW := lm.leftPaneW
-	
+
 	if lm.maxX != 200 || lm.maxY != 50 {
 		t.Errorf("expected (200, 50), got (%d, %d)", lm.maxX, lm.maxY)
 	}
