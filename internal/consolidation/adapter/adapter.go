@@ -1,8 +1,6 @@
 package adapter
 
 import (
-	"strings"
-
 	"github.com/haggishunk/filesprawl/internal/analysis"
 	"github.com/haggishunk/filesprawl/internal/consolidation/browsing"
 	"github.com/haggishunk/filesprawl/internal/object"
@@ -61,29 +59,13 @@ func toFileVersions(files []analysis.FileInfo, hashValue, hashType string) []bro
 			Persisted: true,
 		}
 
-		// For local files, compute the full canonical path
-		// DB stores: RemoteName = scan root, Path = relative path
-		// UI expects: RemoteName = full canonical path
-		remoteName := file.RemoteName
-		if file.ScanRoot != "" {
-			// Local file: construct full canonical path
-			if file.Path != "" && !strings.HasPrefix(file.Path, "/") {
-				// Path is relative, prepend remote name
-				remoteName = file.RemoteName + "/" + file.Path
-			} else if file.Path != "" {
-				// Path is absolute (shouldn't happen, but handle it)
-				remoteName = file.Path
-			}
-		}
-		// For rclone files, RemoteName is already correct
-
 		fv := browsing.FileVersion{
 			FileID:     file.ID,
 			FileInfo:   meta,
 			Hash:       hash,
 			Locations:  locations,
 			Flag:       nil, // File-level flags are not set during initial conversion
-			RemoteName: remoteName,
+			RemoteName: file.RemoteName,
 			Hostname:   file.Hostname,
 		}
 		versions = append(versions, fv)
