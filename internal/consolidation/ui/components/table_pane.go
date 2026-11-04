@@ -16,6 +16,7 @@ type TablePane struct {
 	height        int
 	scrollOffset  int
 	wideView      bool // Show filepath column
+	focused       bool // Whether this pane has input focus
 	flagManager   *browsing.PersistentFlagManager
 }
 
@@ -43,6 +44,11 @@ func (tp *TablePane) SetGroup(group *browsing.DuplicateGroup) {
 func (tp *TablePane) SetDimensions(width, height int) {
 	tp.width = width
 	tp.height = height
+}
+
+// SetFocus sets whether this pane has input focus
+func (tp *TablePane) SetFocus(focused bool) {
+	tp.focused = focused
 }
 
 // ToggleWideView toggles the filepath column
@@ -93,8 +99,13 @@ func (tp *TablePane) Render() string {
 
 	var buf strings.Builder
 
-	// Header
-	buf.WriteString("┌─ FILES IN GROUP ─────────────────┐\n")
+	// Header with focus indicator
+	headerChar := "─"
+	if tp.focused {
+		headerChar = "═"
+	}
+	header := fmt.Sprintf("┌%s FILES IN GROUP %s┐\n", strings.Repeat(headerChar, 1), strings.Repeat(headerChar, 13))
+	buf.WriteString(header)
 
 	// Column headers
 	if tp.wideView {

@@ -23,6 +23,7 @@ type ConsolidationModel struct {
 	selectedIndex int    // Currently selected duplicate group
 	isHashView    bool   // true = hash view, false = filename view
 	modalType     string // Current modal being shown ("" = none)
+	focusedPane   string // "list" or "table" - which pane has focus
 	width         int    // Terminal width
 	height        int    // Terminal height
 
@@ -62,6 +63,7 @@ func NewConsolidationModel(
 		duplicateGroups: duplicateGroups,
 		selectedIndex:   0,
 		isHashView:      true,
+		focusedPane:     "list", // Start with list pane focused
 		modalType:       "",
 		width:           80,
 		height:          24,
@@ -156,6 +158,14 @@ func (m *ConsolidationModel) View() string {
 		result.WriteString(m.banner.Render())
 	}
 
+	// Update focus indicators on panes
+	if m.listPane != nil {
+		m.listPane.SetFocus(m.focusedPane == "list")
+	}
+	if m.tablePane != nil {
+		m.tablePane.SetFocus(m.focusedPane == "table")
+	}
+
 	// Render panes side-by-side
 	var listView, tableView string
 	if m.listPane != nil {
@@ -214,17 +224,51 @@ func (m *ConsolidationModel) combinePanels(leftPane, rightPane string) string {
 // handleKey processes keyboard input
 func (m *ConsolidationModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
+	case "tab":
+		// Switch focus between panes
+		if m.focusedPane == "list" {
+			m.focusedPane = "table"
+		} else {
+			m.focusedPane = "list"
+		}
+	case "shift+tab":
+		// Switch focus between panes (reverse)
+		if m.focusedPane == "list" {
+			m.focusedPane = "table"
+		} else {
+			m.focusedPane = "list"
+		}
 	case "j":
-		m.handleScroll("down")
-		// Update table pane when selection changes
-		m.updateTablePane()
+		// Navigate down in focused pane
+		if m.focusedPane == "list" {
+			if m.listPane != nil {
+				m.listPane.SelectionDown()
+				m.selectedIndex = m.listPane.GetSelectedIndex()
+				m.updateTablePane()
+			}
+		} else {
+			// Navigate in table
+			if m.tablePane != nil {
+				m.tablePane.SelectionDown()
+			}
+		}
 	case "k":
-		m.handleScroll("up")
-		// Update table pane when selection changes
-		m.updateTablePane()
+		// Navigate up in focused pane
+		if m.focusedPane == "list" {
+			if m.listPane != nil {
+				m.listPane.SelectionUp()
+				m.selectedIndex = m.listPane.GetSelectedIndex()
+				m.updateTablePane()
+			}
+		} else {
+			// Navigate in table
+			if m.tablePane != nil {
+				m.tablePane.SelectionUp()
+			}
+		}
 	case "v":
-		// Toggle wide view in table pane
-		if m.tablePane != nil {
+		// Toggle wide view in table pane (only works when table is focused)
+		if m.focusedPane == "table" && m.tablePane != nil {
 			m.tablePane.ToggleWideView()
 		}
 	case "K":
