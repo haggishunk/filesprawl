@@ -35,10 +35,14 @@ type ConsolidationModel struct {
 	duplicateGroups []browsing.DuplicateGroup
 
 	// Components
-	listPane  *components.ListPane
-	tablePane *components.TablePane
-	banner    *components.Banner
-	statusBar *components.StatusBar
+	listPane      *components.ListPane
+	tablePane     *components.TablePane
+	banner        *components.Banner
+	statusBar     *components.StatusBar
+	safetyChecker *components.SafetyChecker
+
+	// UI feedback
+	lastError string // Last error message to display
 }
 
 // NewConsolidationModel creates a new Bubble Tea model
@@ -71,6 +75,7 @@ func NewConsolidationModel(
 	model.tablePane = components.NewTablePane(60, 20, flagManager)
 	model.banner = components.NewBanner(version, len(duplicateGroups), reviewMode, remotes, 80)
 	model.statusBar = components.NewStatusBar(80)
+	model.safetyChecker = components.NewSafetyChecker(flagManager)
 
 	// Set initial group in table
 	if len(duplicateGroups) > 0 {
@@ -163,6 +168,11 @@ func (m *ConsolidationModel) View() string {
 	// Combine panes horizontally
 	panelsView := m.combinePanels(listView, tableView)
 	result.WriteString(panelsView)
+
+	// Render error message if present
+	if m.lastError != "" {
+		fmt.Fprintf(&result, "⚠️ ERROR: %s\n", m.lastError)
+	}
 
 	// Render status bar
 	if m.statusBar != nil {
@@ -283,11 +293,25 @@ func (m *ConsolidationModel) handleAction(action string) {
 			fmt.Printf("Error flagging as ARCHIVE: %v\n", err)
 		}
 	case "delete":
-		// TODO: Check deletion safety before allowing
-		reason := "User flagged via TUI"
-		if err := m.flagManager.PersistDelete(m.ctx, version.FileID, &reason); err != nil {
+		// Check deletion safety
+		selectedGroup := m.listPane.GetSelectedGroup()
+		if selectedGroup == nil {
+			m.lastError = "No group selected"
+			return
+		}
+
+		safe, reason := m.safetyChecker.CheckDeletionSafety(version, selectedGroup)
+		if !safe {
+			m.lastError = reason
+			return
+		}
+
+		// Safe to delete
+		deleteReason := "User flagged via TUI"
+		if err := m.flagManager.PersistDelete(m.ctx, version.FileID, &deleteReason); err != nil {
 			fmt.Printf("Error flagging as DELETE: %v\n", err)
 		}
+		m.lastError = "" // Clear error on success
 	case "skip":
 		if err := m.flagManager.PersistSkip(m.ctx, version.FileID); err != nil {
 			fmt.Printf("Error clearing flag: %v\n", err)
