@@ -15,13 +15,6 @@ CREATE TABLE IF NOT EXISTS location (
   UNIQUE(name, type)
 );
 
-CREATE TABLE IF NOT EXISTS remote (
-  id SERIAL PRIMARY KEY,
-  location_id INT NOT NULL REFERENCES location(id) ON DELETE RESTRICT,
-  remote_name TEXT NOT NULL,
-  scan_root TEXT
-);
-
 CREATE TABLE IF NOT EXISTS object_meta (
   id SERIAL PRIMARY KEY,
   object_name TEXT NOT NULL,
@@ -29,10 +22,11 @@ CREATE TABLE IF NOT EXISTS object_meta (
   object_mime_type TEXT NOT NULL,
   object_size BIGINT NOT NULL DEFAULT 0,
   is_symlink BOOLEAN NOT NULL DEFAULT false,
-  scan_root TEXT
+  location_id INT NOT NULL REFERENCES location(id) ON DELETE RESTRICT,
+  absolute_path TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_object_meta_scan_root ON object_meta (scan_root);
+CREATE INDEX IF NOT EXISTS idx_object_meta_location_path ON object_meta (location_id, absolute_path);
 
 CREATE TABLE IF NOT EXISTS object_hash_junction (
   id SERIAL PRIMARY KEY,
@@ -41,14 +35,6 @@ CREATE TABLE IF NOT EXISTS object_hash_junction (
   object_hash_id INT,
   FOREIGN KEY (object_meta_id) REFERENCES object_meta(id),
   FOREIGN KEY (object_hash_id) REFERENCES object_hash(id)
-);
-
-CREATE TABLE IF NOT EXISTS object_remote_junction (
-  id SERIAL PRIMARY KEY,
-  object_meta_id INT,
-  remote_id INT,
-  FOREIGN KEY (object_meta_id) REFERENCES object_meta(id),
-  FOREIGN KEY (remote_id) REFERENCES remote(id)
 );
 
 -- Consolidation tables for multi-user workflow
