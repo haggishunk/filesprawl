@@ -36,11 +36,13 @@ type Location struct {
 
 // FileVersion represents a file with a specific hash
 type FileVersion struct {
-	FileID    int
-	FileInfo  *object.Meta
-	Hash      *object.Hash
-	Locations []Location
-	Flag      *flags.Flag
+	FileID     int
+	FileInfo   *object.Meta
+	Hash       *object.Hash
+	Locations  []Location
+	Flag       *flags.Flag
+	RemoteName string // Remote identifier (rclone remote name or local path)
+	Hostname   string // Hostname for local scans
 }
 
 // DuplicateGroup represents a group of duplicate files (by hash or filename)

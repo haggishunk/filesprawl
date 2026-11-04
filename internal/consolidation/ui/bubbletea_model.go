@@ -297,8 +297,14 @@ func (m *ConsolidationModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.focusedPane == "table" && m.tablePane != nil {
 			selectedFile := m.tablePane.GetSelectedFile()
 			if selectedFile != nil && selectedFile.FileInfo != nil {
-				// TODO: Open file with system viewer (e.g., less, vim, etc.)
-				m.lastError = fmt.Sprintf("Preview: %s", selectedFile.FileInfo.Path)
+				// Construct full filepath for preview
+				fullPath := m.constructFilePath(selectedFile)
+				if fullPath != "" {
+					// TODO: Open file with system viewer (e.g., less, vim, etc.)
+					m.lastError = fmt.Sprintf("📁 Preview: %s", fullPath)
+				} else {
+					m.lastError = "❌ Cannot construct file path"
+				}
 			}
 		}
 	case "K":
@@ -415,6 +421,36 @@ func (m *ConsolidationModel) handleAction(action string) {
 			m.lastError = "✓ Cleared flags"
 		}
 	}
+}
+
+// constructFilePath builds the full filepath for opening/previewing a file
+// Local files: /scan_root/filepath (or just scan_root if path is relative)
+// Rclone files: remote_name:filepath
+func (m *ConsolidationModel) constructFilePath(version *browsing.FileVersion) string {
+	if version == nil || version.FileInfo == nil {
+		return ""
+	}
+
+	// If ScanRoot is set, it's a local file
+	if version.FileInfo.ScanRoot != "" {
+		// Local file: construct full path from scan root + relative path
+		// ScanRoot is like "/goblet/light" and Path is like "photos/travis-transfer/..."
+		// Result should be: "/goblet/light/photos/travis-transfer/..."
+		if version.FileInfo.Path == "" {
+			return version.FileInfo.ScanRoot
+		}
+		return fmt.Sprintf("%s/%s", version.FileInfo.ScanRoot, version.FileInfo.Path)
+	}
+
+	// Rclone remote file: construct as remote_name:path
+	// RemoteName is like "goblet" and Path is like "photos/travis-transfer/..."
+	// Result should be: "goblet:photos/travis-transfer/..."
+	if version.RemoteName != "" && version.FileInfo.Path != "" {
+		return fmt.Sprintf("%s:%s", version.RemoteName, version.FileInfo.Path)
+	}
+
+	// Fallback to just the path
+	return version.FileInfo.Path
 }
 
 // showHelp displays help
