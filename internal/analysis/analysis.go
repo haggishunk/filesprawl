@@ -135,6 +135,7 @@ func (d *DuplicateDetector) enrichFilenames(ctx context.Context, groups []reposi
 				MimeType:     rec.MimeType,
 				Size:         rec.Size,
 				LocationId:   rec.LocationId,
+				AbsolutePath: rec.AbsolutePath,
 				LocationName: rec.LocationName,
 				LocationType: rec.LocationType,
 			}

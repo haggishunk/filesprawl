@@ -812,11 +812,11 @@ func (r *ObjectRepository) GetFilesByFilename(ctx context.Context, filename stri
 
 	statement := fmt.Sprintf(`
 		SELECT om.id, om.object_name, om.object_path, om.object_mime_type, om.object_size,
-		       om.location_id, l.name, l.type
+		       om.location_id, om.absolute_path, l.name, l.type
 		FROM object_meta om
 		JOIN location l ON om.location_id = l.id
 		%s
-		ORDER BY om.object_path;
+		ORDER BY om.absolute_path;
 	`, where)
 
 	rows, err := r.db.Query(ctx, statement, args...)
@@ -829,7 +829,7 @@ func (r *ObjectRepository) GetFilesByFilename(ctx context.Context, filename stri
 	for rows.Next() {
 		var f FileRecord
 		if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size,
-			&f.LocationId, &f.LocationName, &f.LocationType); err != nil {
+			&f.LocationId, &f.AbsolutePath, &f.LocationName, &f.LocationType); err != nil {
 			return nil, fmt.Errorf("failed to scan file record: %w", err)
 		}
 		records = append(records, f)
@@ -840,37 +840,4 @@ func (r *ObjectRepository) GetFilesByFilename(ctx context.Context, filename stri
 	}
 
 	return records, nil
-}
-
-// GetScannedDirectories returns all unique directories that have been indexed
-// for a given location. Used by --only-missing-dirs flag to find directories
-// that still need to be scanned.
-func (r *ObjectRepository) GetScannedDirectories(ctx context.Context, locationID int) (map[string]bool, error) {
-	statement := `
-		SELECT DISTINCT object_directory
-		FROM object_meta
-		WHERE location_id = $1 AND object_directory != ''
-		ORDER BY object_directory;
-	`
-
-	rows, err := r.db.Query(ctx, statement, locationID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query scanned directories: %w", err)
-	}
-	defer rows.Close()
-
-	scannedDirs := make(map[string]bool)
-	for rows.Next() {
-		var dir string
-		if err := rows.Scan(&dir); err != nil {
-			return nil, fmt.Errorf("failed to scan directory: %w", err)
-		}
-		scannedDirs[dir] = true
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating directories: %w", err)
-	}
-
-	return scannedDirs, nil
 }
