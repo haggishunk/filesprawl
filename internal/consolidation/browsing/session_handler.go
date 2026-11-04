@@ -8,12 +8,12 @@ import (
 
 // SessionHandler manages session lifecycle including save and exit
 type SessionHandler struct {
-	session              *SessionManager
-	flagManager          *PersistentFlagManager
-	summaryRenderer      *SummaryRenderer
-	lastSaveTime         time.Time
-	unsavedChanges       bool
-	autoSaveInterval     time.Duration
+	session          *SessionManager
+	flagManager      *PersistentFlagManager
+	summaryRenderer  *SummaryRenderer
+	lastSaveTime     time.Time
+	unsavedChanges   bool
+	autoSaveInterval time.Duration
 }
 
 // NewSessionHandler creates a new session handler
@@ -47,7 +47,7 @@ func (sh *SessionHandler) QuitWithoutConsolidation(ctx context.Context) (string,
 
 		// Show what was saved
 		keep, archive, delete := sh.summaryRenderer.countDecisions(sessionData.Flags)
-		output += fmt.Sprintf("Saved flags:\n")
+		output += "Saved flags:\n"
 		output += fmt.Sprintf("  🟢 KEEP:    %d files\n", keep)
 		output += fmt.Sprintf("  📦 ARCHIVE: %d files\n", archive)
 		output += fmt.Sprintf("  🗑️  DELETE:  %d files\n\n", delete)
@@ -108,11 +108,11 @@ func (sh *SessionHandler) GetSessionSummary() string {
 
 	// Flags summary
 	keep, archive, delete := sh.summaryRenderer.countDecisions(sessionData.Flags)
-	output += fmt.Sprintf("\nFlagged Decisions:\n")
+	output += "\nFlagged Decisions:\n"
 	output += fmt.Sprintf("  KEEP:    %3d\n", keep)
 	output += fmt.Sprintf("  ARCHIVE: %3d\n", archive)
 	output += fmt.Sprintf("  DELETE:  %3d\n", delete)
-	output += fmt.Sprintf("  ─────────────\n")
+	output += "  ─────────────\n"
 	output += fmt.Sprintf("  TOTAL:   %3d\n", keep+archive+delete)
 
 	// Expanded items

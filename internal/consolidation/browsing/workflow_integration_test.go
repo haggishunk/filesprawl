@@ -74,7 +74,7 @@ func TestFlagingWorkflow(t *testing.T) {
 		t.Error("should allow KEEP transition from NONE")
 	}
 
-	fsm.TransitionKeep()
+	_ = fsm.TransitionKeep()
 	state := fsm.GetCurrentState()
 	if state.FlagType != flags.FlagTypeKeep {
 		t.Errorf("expected KEEP, got %s", state.FlagType)
@@ -86,7 +86,7 @@ func TestFlagingWorkflow(t *testing.T) {
 		t.Error("should allow ARCHIVE transition")
 	}
 
-	fsm.TransitionArchive(&dest)
+	_ = fsm.TransitionArchive(&dest)
 	state = fsm.GetCurrentState()
 	if state.FlagType != flags.FlagTypeArchive {
 		t.Errorf("expected ARCHIVE, got %s", state.FlagType)

@@ -21,12 +21,12 @@ type BrowsingScreen struct {
 	detailsWidget  *widgets.DetailsWidget
 	bannerWidget   *widgets.BannerWidget
 	currentWidget  widgets.BrowsingWidget // pointer to current active widget
-	isHashView     bool                    // true for hash, false for filename
+	isHashView     bool                   // true for hash, false for filename
 	ctx            context.Context
-	app            *gotui.Application     // reference to gotui app for event handling
-	version        string                 // application version
-	reviewMode     bool                   // true if in review mode
-	remotes        []string               // list of configured remotes
+	app            *gotui.Application // reference to gotui app for event handling
+	version        string             // application version
+	reviewMode     bool               // true if in review mode
+	remotes        []string           // list of configured remotes
 }
 
 // NewBrowsingScreen creates a new browsing screen
@@ -42,12 +42,12 @@ func NewBrowsingScreen(
 ) *BrowsingScreen {
 	// Create banner with initial info
 	bannerInfo := &widgets.BannerInfo{
-		Version:       version,
-		ReviewMode:    reviewMode,
-		ExecuteMode:   !reviewMode,
-		Remotes:       remotes,
+		Version:         version,
+		ReviewMode:      reviewMode,
+		ExecuteMode:     !reviewMode,
+		Remotes:         remotes,
 		TotalDuplicates: 0,
-		FlaggedCount:  0,
+		FlaggedCount:    0,
 	}
 	bannerWidget := widgets.NewBannerWidget(bannerInfo)
 
@@ -112,9 +112,13 @@ func (bs *BrowsingScreen) Show(ctx context.Context, app interface{}) error {
 	statusWidget := widgets.NewStatusWidget()
 	statusSession := bs.sessionManager.GetSession()
 	if statusSession != nil {
-		statusWidget.UpdateStatus(statusSession)
+		if err := statusWidget.UpdateStatus(statusSession); err != nil {
+			fmt.Printf("Warning: Failed to update status: %v\n", err)
+		}
 	}
-	statusWidget.SetRect(statusX, statusY, statusW, statusH)
+	if err := statusWidget.SetRect(statusX, statusY, statusW, statusH); err != nil {
+		fmt.Printf("Warning: Failed to set status rect: %v\n", err)
+	}
 
 	// Configure banner widget position
 	bs.bannerWidget.SetRect(bannerX, bannerY, bannerW, bannerH)
@@ -123,10 +127,10 @@ func (bs *BrowsingScreen) Show(ctx context.Context, app interface{}) error {
 	fmt.Println("═══════════════════════════════════════════════════════════════")
 	fmt.Println("BrowsingScreen: 4-pane TUI layout with banner initialized")
 	fmt.Println("═══════════════════════════════════════════════════════════════")
-	fmt.Println(fmt.Sprintf("Banner (info):              (%d,%d) %dx%d", bannerX, bannerY, bannerW, bannerH))
-	fmt.Println(fmt.Sprintf("List pane (hash/filename):  (%d,%d) %dx%d", listX, listY, listW, listH))
-	fmt.Println(fmt.Sprintf("Details pane (file info):   (%d,%d) %dx%d", detailsX, detailsY, detailsW, detailsH))
-	fmt.Println(fmt.Sprintf("Status bar (controls):      (%d,%d) %dx%d", statusX, statusY, statusW, statusH))
+	fmt.Printf("Banner (info):              (%d,%d) %dx%d\n", bannerX, bannerY, bannerW, bannerH)
+	fmt.Printf("List pane (hash/filename):  (%d,%d) %dx%d\n", listX, listY, listW, listH)
+	fmt.Printf("Details pane (file info):   (%d,%d) %dx%d\n", detailsX, detailsY, detailsW, detailsH)
+	fmt.Printf("Status bar (controls):      (%d,%d) %dx%d\n", statusX, statusY, statusW, statusH)
 
 	// Debug: Show what data is loaded
 	session := bs.sessionManager.GetSession()
@@ -553,35 +557,6 @@ func (bs *BrowsingScreen) updateDetailsPane() error {
 	return bs.detailsWidget.ShowGroup(&group)
 }
 
-// updateStatusBar updates the status bar with flag counts
-func (bs *BrowsingScreen) updateStatusBar() {
-	if bs.flagManager == nil {
-		return
-	}
-
-	viewMode := "HASH"
-	if !bs.isHashView {
-		viewMode = "FILENAME"
-	}
-
-	// TODO: Phase 4 - Get flag counts from flagManager
-	keep := 0
-	archive := 0
-	delete := 0
-
-	statusText := fmt.Sprintf("View: %s | 🟢 Keep: %d | 📦 Archive: %d | 🗑️  Delete: %d | [q]uit [v]iew [k]eep [a]rchive [d]elete [s]kip",
-		viewMode, keep, archive, delete)
-
-	fmt.Println(statusText)
-}
-
-// updateListPane refreshes the list if needed
-func (bs *BrowsingScreen) updateListPane() error {
-	// This would trigger re-rendering of the list widget
-	// For now, the widgets handle this internally
-	return nil
-}
-
 // EventDispatchWrapper wraps a gotui widget to intercept and dispatch keyboard events
 // This implements the gotui EventHandler interface to handle keyboard input
 type EventDispatchWrapper struct {
@@ -660,15 +635,4 @@ func (w *EventDispatchWrapper) Unlock() {
 	if w != nil && w.widget != nil {
 		w.widget.Unlock()
 	}
-}
-
-// persistFlag saves a flag decision to the database
-func (bs *BrowsingScreen) persistFlag(fileID int, flagType string, data map[string]interface{}) error {
-	if bs.flagManager == nil || bs.ctx == nil {
-		return fmt.Errorf("flag manager or context not initialized")
-	}
-
-	// Implementation depends on flag type
-	// This is handled by the flag manager's PersistKeep/Archive/Delete methods
-	return nil
 }

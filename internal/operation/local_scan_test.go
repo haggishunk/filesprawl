@@ -35,7 +35,9 @@ func TestComputeHashesValidFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
 
 	content := []byte("test content for hashing")
 	if _, err := tmpFile.Write(content); err != nil {
@@ -43,14 +45,14 @@ func TestComputeHashesValidFile(t *testing.T) {
 	}
 
 	// Seek back to beginning
-	tmpFile.Seek(0, 0)
+	_, _ = tmpFile.Seek(0, 0)
 
 	hashes := make(map[string]string)
 	if err := computeHashes(tmpFile, hashes); err != nil {
 		t.Fatalf("computeHashes failed: %v", err)
 	}
 
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	// Verify we have hashes
 	expectedHashes := []string{"md5", "sha1", "sha256"}
@@ -87,8 +89,10 @@ func TestScanLocalFilePath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
-	tmpFile.Close()
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
+	_ = tmpFile.Close()
 
 	// Try to scan a file (not directory)
 	ls := NewLocalScanner(WithLocalRoot(tmpFile.Name()))

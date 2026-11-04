@@ -25,12 +25,12 @@ func (r *FilenameViewRenderer) Render(session *BrowsingSession, pageSize int) st
 
 	// Show summary
 	flagCounts := countFlags(session.Flags)
-	output.WriteString(fmt.Sprintf("Total files: %d | Different names: %d | Flagged: %d\n",
+	fmt.Fprintf(&output, "Total files: %d | Different names: %d | Flagged: %d\n",
 		len(session.Flags),
 		len(session.DuplicateGroups),
 		len(session.Flags),
-	))
-	output.WriteString(fmt.Sprintf("Actions: [k]eep [a]rchive [d]elete [TAB]view [Q]uit\n\n"))
+	)
+	output.WriteString("Actions: [k]eep [a]rchive [d]elete [TAB]view [Q]uit\n\n")
 
 	// Render each file (filename) with its versions
 	for i, group := range session.DuplicateGroups {
@@ -42,7 +42,7 @@ func (r *FilenameViewRenderer) Render(session *BrowsingSession, pageSize int) st
 	output.WriteString("Summary: ")
 	for flagType, count := range flagCounts {
 		if count > 0 {
-			output.WriteString(fmt.Sprintf("%s=%d ", flagType, count))
+			fmt.Fprintf(&output, "%s=%d ", flagType, count)
 		}
 	}
 	output.WriteString("\n\n")
@@ -66,14 +66,14 @@ func (r *FilenameViewRenderer) renderFilename(output *strings.Builder, group Dup
 	// Count unique hashes (versions)
 	versionCount := len(group.Versions)
 
-	output.WriteString(fmt.Sprintf("%s%s (%d version%s)%s %s\n",
+	fmt.Fprintf(output, "%s%s (%d version%s)%s %s\n",
 		prefix,
 		group.Identifier,
 		versionCount,
 		pluralize(versionCount),
 		status,
 		indicator,
-	))
+	)
 
 	// Render version details if expanded
 	if expanded[group.Identifier] {
@@ -94,22 +94,20 @@ func (r *FilenameViewRenderer) renderVersionDetails(output *strings.Builder, gro
 			flagStr = fmt.Sprintf(" [%s]", version.Flag.FlagType)
 		}
 
-		output.WriteString(fmt.Sprintf("    Version %d (hash: %s, %d location%s) %s%s\n",
+		fmt.Fprintf(output, "    Version %d (hash: %s, %d location%s) %s%s\n",
 			versionNum,
 			truncateHash(version.Hash.Hash, 6),
 			len(version.Locations),
 			pluralize(len(version.Locations)),
 			indicator,
-			flagStr,
-		))
+			flagStr)
 
 		// Show locations
 		for _, loc := range version.Locations {
 			locIndicator := getLocationIndicator(1, len(group.Versions))
-			output.WriteString(fmt.Sprintf("      %s %s\n",
+			fmt.Fprintf(output, "      %s %s\n",
 				locIndicator,
-				loc.Name,
-			))
+				loc.Name)
 		}
 	}
 	output.WriteString("\n")

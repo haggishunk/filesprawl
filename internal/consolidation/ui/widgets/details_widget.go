@@ -9,8 +9,8 @@ import (
 
 // DetailsWidget displays detailed information about a selected DuplicateGroup
 type DetailsWidget struct {
-	paragraph *widgets.Paragraph
-	analyzer  *browsing.PresenceAnalyzer
+	paragraph           *widgets.Paragraph
+	analyzer            *browsing.PresenceAnalyzer
 	x, y, width, height int // Rectangle dimensions
 }
 
@@ -53,9 +53,9 @@ func (w *DetailsWidget) formatGroupDetails(group *browsing.DuplicateGroup) strin
 	}
 
 	output := ""
-	output += fmt.Sprintf("\n╔════════════════════════════════════════════════════════════════╗\n")
+	output += "\n╔════════════════════════════════════════════════════════════════╗\n"
 	output += fmt.Sprintf("║ DUPLICATE GROUP - %s                                         ║\n", truncateStr(group.Identifier, 30))
-	output += fmt.Sprintf("╚════════════════════════════════════════════════════════════════╝\n\n")
+	output += "╚════════════════════════════════════════════════════════════════╝\n\n"
 
 	output += fmt.Sprintf("📊 Summary: %d copies found", group.Count)
 	if group.Flag != nil {
@@ -68,7 +68,7 @@ func (w *DetailsWidget) formatGroupDetails(group *browsing.DuplicateGroup) strin
 		output += "No versions found\n"
 	} else {
 		output += fmt.Sprintf("📋 COPIES (%d):\n", len(group.Versions))
-		output += fmt.Sprintf("─────────────────────────────────────────────────────────────────\n")
+		output += "─────────────────────────────────────────────────────────────────\n"
 
 		for vIdx, version := range group.Versions {
 			if version.Hash == nil && version.FileInfo == nil {
@@ -100,7 +100,7 @@ func (w *DetailsWidget) formatGroupDetails(group *browsing.DuplicateGroup) strin
 
 			// Show locations for this version
 			if len(version.Locations) > 0 {
-				output += fmt.Sprintf("   📍 Locations:\n")
+				output += "   📍 Locations:\n"
 				for _, loc := range version.Locations {
 					locType := "📂"
 					if loc.Type == "remote" {
@@ -109,17 +109,17 @@ func (w *DetailsWidget) formatGroupDetails(group *browsing.DuplicateGroup) strin
 					output += fmt.Sprintf("      %s %s (%s)\n", locType, loc.Name, loc.Type)
 				}
 			} else {
-				output += fmt.Sprintf("   ⚠️  No location information\n")
+				output += "   ⚠️  No location information\n"
 			}
 		}
 
-		output += fmt.Sprintf("\n─────────────────────────────────────────────────────────────────\n")
+		output += "\n─────────────────────────────────────────────────────────────────\n"
 
 		// Show locations summary
 		output += w.formatLocationsSummary(group)
 	}
 
-	output += fmt.Sprintf("\n🎯 Actions: [K]eep | [a]rchive | [d]elete | [s]kip | [v]iew toggle\n")
+	output += "\n🎯 Actions: [K]eep | [a]rchive | [d]elete | [s]kip | [v]iew toggle\n"
 	return output
 }
 

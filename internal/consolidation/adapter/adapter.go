@@ -85,7 +85,7 @@ func extractLocations(allFiles []analysis.FileInfo, targetFile analysis.FileInfo
 	for _, file := range allFiles {
 		locKey := getLocationKey(file)
 		if _, exists := locationMap[locKey]; !exists {
-			locOrder = append(locOrder, locKey)
+			_ = append(locOrder, locKey) // locOrder not used in current implementation
 		}
 		loc := locationMap[locKey]
 		if loc == nil {
