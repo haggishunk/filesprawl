@@ -4,6 +4,7 @@
 "npm:prettier" = "latest"
 actionlint = "latest"
 hk = "latest"
+golangci-lint = "latest"
 shellcheck = "latest"
 shellharden = "latest"
 zizmor = "latest"

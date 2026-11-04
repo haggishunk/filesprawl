@@ -32,10 +32,6 @@ jobs:
         with:
           log_level: info
 
-      - name: Install hk
-        run: |
-          curl -fsSL https://get.jetify.com/hk | bash
-
       - name: Run hk pre-commit checks on changed files
         env:
           BASE_REF: ${{ github.base_ref }}
