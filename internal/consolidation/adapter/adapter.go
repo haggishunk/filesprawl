@@ -44,13 +44,14 @@ func toFileVersions(files []analysis.FileInfo, hashValue, hashType string) []bro
 		locations := extractLocations(files, file)
 
 		meta := &object.Meta{
-			Id:        file.ID,
-			Name:      file.Name,
-			Path:      file.Path,
-			MimeType:  file.MimeType,
-			Size:      file.Size,
-			ScanRoot:  file.ScanRoot,
-			Persisted: true,
+			Id:           file.ID,
+			Name:         file.Name,
+			Path:         file.Path,
+			MimeType:     file.MimeType,
+			Size:         file.Size,
+			LocationId:   file.LocationId,
+			AbsolutePath: file.AbsolutePath,
+			Persisted:    true,
 		}
 
 		hash := &object.Hash{
@@ -60,13 +61,13 @@ func toFileVersions(files []analysis.FileInfo, hashValue, hashType string) []bro
 		}
 
 		fv := browsing.FileVersion{
-			FileID:     file.ID,
-			FileInfo:   meta,
-			Hash:       hash,
-			Locations:  locations,
-			Flag:       nil, // File-level flags are not set during initial conversion
-			RemoteName: file.RemoteName,
-			Hostname:   file.Hostname,
+			FileID:       file.ID,
+			FileInfo:     meta,
+			Hash:         hash,
+			Locations:    locations,
+			Flag:         nil, // File-level flags are not set during initial conversion
+			LocationId:   file.LocationId,
+			LocationName: file.LocationName,
 		}
 		versions = append(versions, fv)
 	}
@@ -74,69 +75,35 @@ func toFileVersions(files []analysis.FileInfo, hashValue, hashType string) []bro
 }
 
 // extractLocations builds Location objects for a file based on distinct locations in the group.
-// Groups all files by location (hostname/remoteName combination) and counts files per location.
+// Groups all files by location ID and counts files per location.
 func extractLocations(allFiles []analysis.FileInfo, targetFile analysis.FileInfo) []browsing.Location {
 	if len(allFiles) == 0 {
 		return []browsing.Location{}
 	}
 
 	// Build map of distinct locations and their file counts
-	locationMap := make(map[string]*browsing.Location)
-	locOrder := []string{} // Track insertion order
+	locationMap := make(map[int]*browsing.Location)
 
 	for _, file := range allFiles {
-		locKey := getLocationKey(file)
-		if _, exists := locationMap[locKey]; !exists {
-			_ = append(locOrder, locKey) // locOrder not used in current implementation
-		}
-		loc := locationMap[locKey]
+		locID := file.LocationId
+		loc := locationMap[locID]
 		if loc == nil {
-			locType := inferLocationType(file)
 			loc = &browsing.Location{
-				Name:      getLocationName(file),
-				Type:      locType,
+				ID:        locID,
+				Name:      file.LocationName,
+				Type:      file.LocationType,
 				FileCount: 0,
 				Indicator: browsing.PresenceGreen, // Default, may be updated elsewhere
 			}
-			locationMap[locKey] = loc
+			locationMap[locID] = loc
 		}
 		loc.FileCount++
 	}
 
 	// Return locations only for the target file's location
-	targetLocKey := getLocationKey(targetFile)
-	if loc, ok := locationMap[targetLocKey]; ok {
+	if loc, ok := locationMap[targetFile.LocationId]; ok {
 		return []browsing.Location{*loc}
 	}
 
 	return []browsing.Location{}
-}
-
-// getLocationKey creates a unique key for a file's location.
-func getLocationKey(file analysis.FileInfo) string {
-	hostname := file.Hostname
-	if hostname == "" {
-		hostname = "localhost"
-	}
-	return hostname + ":" + file.RemoteName
-}
-
-// getLocationName formats the location name from hostname and remote name.
-func getLocationName(file analysis.FileInfo) string {
-	hostname := file.Hostname
-	if hostname == "" {
-		// Local file
-		return file.RemoteName
-	}
-	// Remote file - combine hostname and remote name
-	return hostname + "/" + file.RemoteName
-}
-
-// inferLocationType determines if a location is "local" or "remote" based on the FileInfo.
-// A location is considered local if the hostname is empty (local filesystem).
-func inferLocationType(file analysis.FileInfo) string {
-	if file.Hostname == "" {
-		return "local"
-	}
-	return "remote"
 }

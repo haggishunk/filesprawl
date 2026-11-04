@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/haggishunk/filesprawl/internal/database"
 	"github.com/haggishunk/filesprawl/internal/location"
@@ -24,14 +23,15 @@ type HashGroup struct {
 
 // FileRecord holds per-file metadata returned by GetFilesByHash.
 type FileRecord struct {
-	ID         int
-	Name       string
-	Path       string
-	MimeType   string
-	Size       int64
-	RemoteName string
-	Hostname   string
-	ScanRoot   string
+	ID           int
+	Name         string
+	Path         string
+	MimeType     string
+	Size         int64
+	LocationId   int
+	AbsolutePath string
+	LocationName string
+	LocationType string
 }
 
 type ObjectRepository struct {
@@ -109,12 +109,12 @@ func (r *ObjectRepository) WriteMeta(ctx context.Context, m *object.Meta) error 
 	var id int
 
 	statement := `
-		INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, is_symlink, scan_root)
-		VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''))
+		INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, is_symlink, location_id, absolute_path)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id;
 	`
 
-	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.Size, m.IsSymlink, m.ScanRoot)
+	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.Size, m.IsSymlink, m.LocationId, m.AbsolutePath)
 	err := row.Scan(&id)
 
 	if err != nil {
@@ -132,17 +132,18 @@ func (r *ObjectRepository) ReadMeta(ctx context.Context, m *object.Meta) error {
 	var id int
 	var size int64
 	var isSymlink bool
-	var scanRoot string
+	var locationId int
+	var absolutePath string
 
 	statement := `
-		SELECT id, object_size, is_symlink, COALESCE(scan_root, '')
+		SELECT id, object_size, is_symlink, location_id, COALESCE(absolute_path, '')
 		FROM object_meta
 		WHERE object_name = $1 AND object_path = $2 AND object_mime_type = $3
-		  AND scan_root IS NOT DISTINCT FROM NULLIF($4, '');
+		  AND absolute_path IS NOT DISTINCT FROM NULLIF($4, '');
 	`
 
-	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.ScanRoot)
-	err := row.Scan(&id, &size, &isSymlink, &scanRoot)
+	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.AbsolutePath)
+	err := row.Scan(&id, &size, &isSymlink, &locationId, &absolutePath)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -157,7 +158,8 @@ func (r *ObjectRepository) ReadMeta(ctx context.Context, m *object.Meta) error {
 	m.Id = id
 	m.Size = size
 	m.IsSymlink = isSymlink
-	m.ScanRoot = scanRoot
+	m.LocationId = locationId
+	m.AbsolutePath = absolutePath
 	m.Persisted = true
 	return nil
 }
@@ -214,59 +216,14 @@ func (r *ObjectRepository) WriteMetaHashJunction(ctx context.Context, mhj *objec
 	return nil
 }
 
+// ReadRemote is deprecated and no longer used with consolidated schema
 func (r *ObjectRepository) ReadRemote(ctx context.Context, rem *remote.Remote) error {
-	var id int
-	var locationId int
-
-	statement := `
-		SELECT id, location_id
-		FROM remote
-		WHERE location_id = $1 AND remote_name = $2;
-	`
-
-	row := r.db.QueryRow(ctx, statement, rem.LocationId, rem.Name)
-	err := row.Scan(&id, &locationId)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			fmt.Printf("No remote found in db.\n")
-			return nil
-		}
-		return fmt.Errorf("failed to retrieve remote: %w", err)
-	}
-
-	rem.Id = id
-	rem.LocationId = locationId
-	rem.Persisted = true
-	return nil
+	return fmt.Errorf("ReadRemote is deprecated - use Location directly instead")
 }
 
+// WriteRemote is deprecated and no longer used with consolidated schema
 func (r *ObjectRepository) WriteRemote(ctx context.Context, rem *remote.Remote) error {
-	var id int
-
-	// Ensure location exists in database
-	err := r.ensureLocation(ctx, &rem.Location)
-	if err != nil {
-		return fmt.Errorf("failed to ensure location: %w", err)
-	}
-
-	// Update remote's location_id from the persisted location
-	rem.LocationId = rem.Location.Id
-
-	statement := `
-		INSERT INTO remote (location_id, remote_name)
-		VALUES ($1, $2)
-		RETURNING id;
-	`
-
-	row := r.db.QueryRow(ctx, statement, rem.LocationId, rem.Name)
-	err = row.Scan(&id)
-	if err != nil {
-		return fmt.Errorf("failed to persist remote: %w", err)
-	}
-
-	rem.Id = id
-	rem.Persisted = true
-	return nil
+	return fmt.Errorf("WriteRemote is deprecated - use Location directly instead")
 }
 
 func (r *ObjectRepository) ReadLocation(ctx context.Context, loc *location.Location) error {
@@ -313,7 +270,7 @@ func (r *ObjectRepository) WriteLocation(ctx context.Context, loc *location.Loca
 	return nil
 }
 
-func (r *ObjectRepository) ensureLocation(ctx context.Context, loc *location.Location) error {
+func (r *ObjectRepository) EnsureLocation(ctx context.Context, loc *location.Location) error {
 	if loc == nil {
 		return fmt.Errorf("location is required")
 	}
@@ -337,76 +294,19 @@ func (r *ObjectRepository) ensureLocation(ctx context.Context, loc *location.Loc
 	return nil
 }
 
+// ReadObjectRemoteJunction is deprecated and no longer used with consolidated schema
 func (r *ObjectRepository) ReadObjectRemoteJunction(ctx context.Context, orj *object.ObjectRemoteJunction) error {
-	var id int
-
-	statement := `
-		SELECT id
-		FROM object_remote_junction
-		WHERE object_meta_id = $1 AND remote_id = $2;
-	`
-
-	row := r.db.QueryRow(ctx, statement, orj.MetaId, orj.RemoteId)
-	err := row.Scan(&id)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			fmt.Printf("No object-remote junction found in db.\n")
-			return nil
-		}
-		return fmt.Errorf("failed to retrieve object remote junction: %w", err)
-	}
-
-	orj.Id = id
-	orj.Persisted = true
-	return nil
+	return fmt.Errorf("ReadObjectRemoteJunction is deprecated - object_remote_junction table no longer exists")
 }
 
+// WriteObjectRemoteJunction is deprecated and no longer used with consolidated schema
 func (r *ObjectRepository) WriteObjectRemoteJunction(ctx context.Context, orj *object.ObjectRemoteJunction) error {
-	var id int
-
-	statement := `
-		INSERT INTO object_remote_junction (object_meta_id, remote_id)
-		VALUES ($1, $2)
-		RETURNING id;
-	`
-
-	row := r.db.QueryRow(ctx, statement, orj.MetaId, orj.RemoteId)
-	err := row.Scan(&id)
-	if err != nil {
-		return fmt.Errorf("failed to persist object remote junction: %w", err)
-	}
-
-	orj.Id = id
-	orj.Persisted = true
-	return nil
-}
-
-func (r *ObjectRepository) ensureRemote(ctx context.Context, rem *remote.Remote) error {
-	if rem == nil {
-		return fmt.Errorf("remote is required")
-	}
-	if rem.Persisted {
-		return nil
-	}
-
-	err := r.ReadRemote(ctx, rem)
-	if err != nil {
-		return fmt.Errorf("failed to get remote from db: %w", err)
-	}
-	if rem.Persisted {
-		return nil
-	}
-
-	err = r.WriteRemote(ctx, rem)
-	if err != nil {
-		return fmt.Errorf("failed to put remote into db: %w", err)
-	}
-
-	return nil
+	return fmt.Errorf("WriteObjectRemoteJunction is deprecated - object_remote_junction table no longer exists")
 }
 
 func (r *ObjectRepository) PersistResult(ctx context.Context, rem *remote.Remote, lri rclone.ListResponseItem, scanRoot string) error {
 	// get or set object meta
+	// Note: LocationId and AbsolutePath must be set on the Meta before calling this method
 	m := object.NewMeta(lri.Name, lri.Path, lri.MimeType, object.WithMetaSize(lri.Size), object.WithMetaScanRoot(scanRoot))
 	fmt.Printf("Found object meta: %s\n", m)
 	err := r.ReadMeta(ctx, &m)
@@ -422,28 +322,6 @@ func (r *ObjectRepository) PersistResult(ctx context.Context, rem *remote.Remote
 			return fmt.Errorf("failed to put object into db: %w", err)
 		}
 		fmt.Printf("as %d\n", m.Id)
-	}
-
-	err = r.ensureRemote(ctx, rem)
-	if err != nil {
-		return err
-	}
-
-	orj := object.NewObjectRemoteJunction(m.Id, rem.Id)
-	fmt.Printf("Found object-remote junction: %+v\n", orj)
-	err = r.ReadObjectRemoteJunction(ctx, &orj)
-	if err != nil {
-		return fmt.Errorf("failed to get object remote junction from db: %w", err)
-	}
-	if orj.Persisted {
-		fmt.Printf("Read object remote junction id: %d\n", orj.Id)
-	} else {
-		fmt.Printf("Persisting object-remote junction...  ")
-		err = r.WriteObjectRemoteJunction(ctx, &orj)
-		if err != nil {
-			return fmt.Errorf("failed to set object remote junction in db: %w", err)
-		}
-		fmt.Printf("as id: %d\n", orj.Id)
 	}
 
 	// get or set hash
@@ -488,6 +366,7 @@ func (r *ObjectRepository) PersistResult(ctx context.Context, rem *remote.Remote
 }
 
 // PersistLocalResult persists a local file scan result to the database
+// Note: LocationId and AbsolutePath must be set on the Meta before calling this method
 func (r *ObjectRepository) PersistLocalResult(ctx context.Context, rem *remote.Remote, m *object.Meta, hashes map[string]string) error {
 	// Persist metadata
 	fmt.Printf("Found local object meta: %s\n", m)
@@ -504,30 +383,6 @@ func (r *ObjectRepository) PersistLocalResult(ctx context.Context, rem *remote.R
 			return fmt.Errorf("failed to persist local object meta: %w", err)
 		}
 		fmt.Printf("as %d\n", m.Id)
-	}
-
-	// Ensure remote (local type)
-	err = r.ensureRemote(ctx, rem)
-	if err != nil {
-		return err
-	}
-
-	// Persist object-remote junction
-	orj := object.NewObjectRemoteJunction(m.Id, rem.Id)
-	fmt.Printf("Found local object-remote junction: %+v\n", orj)
-	err = r.ReadObjectRemoteJunction(ctx, &orj)
-	if err != nil {
-		return fmt.Errorf("failed to get object remote junction from db: %w", err)
-	}
-	if orj.Persisted {
-		fmt.Printf("Read object remote junction id: %d\n", orj.Id)
-	} else {
-		fmt.Printf("Persisting local object-remote junction...  ")
-		err = r.WriteObjectRemoteJunction(ctx, &orj)
-		if err != nil {
-			return fmt.Errorf("failed to persist local object remote junction: %w", err)
-		}
-		fmt.Printf("as id: %d\n", orj.Id)
 	}
 
 	// Persist hashes
@@ -621,29 +476,11 @@ func (r *ObjectRepository) FindDuplicatesAcrossRemotes(ctx context.Context, hash
 	return groups, nil
 }
 
-// FindDuplicatesWithinRemote returns hashes shared by more than one file within
-// a specific remote. Optionally filter by hashType (empty = all types).
-// Accepts remoteName in either "remote_name" or "location/remote_name" format.
-func (r *ObjectRepository) FindDuplicatesWithinRemote(ctx context.Context, remoteName, hashType string, limit, offset int) ([]HashGroup, error) {
-	// Parse remote name which can be in format:
-	// - "remote_name" (for rclone remotes or local scans)
-	// - "location_name/remote_name" (for scans with location prefix, shown in report output)
-	var queryClause string
+// FindDuplicatesWithinLocation returns hashes shared by more than one file within
+// a specific location. Optionally filter by hashType (empty = all types).
+func (r *ObjectRepository) FindDuplicatesWithinLocation(ctx context.Context, locationId int, hashType string, limit, offset int) ([]HashGroup, error) {
 	var args []interface{}
-
-	if strings.Contains(remoteName, "/") {
-		// Format: "location_name/remote_name" - match both location name and remote_name
-		parts := strings.SplitN(remoteName, "/", 2)
-		locationName := parts[0]
-		name := parts[1]
-		queryClause = "WHERE l.name = $1 AND r.remote_name = $2"
-		args = []interface{}{locationName, name}
-	} else {
-		// Format: "remote_name" - match just the remote name
-		// Note: This also matches remotes from any location (backward compatibility)
-		queryClause = "WHERE r.remote_name = $1"
-		args = []interface{}{remoteName}
-	}
+	args = append(args, locationId)
 
 	hashFilter := ""
 	if hashType != "" {
@@ -663,20 +500,17 @@ func (r *ObjectRepository) FindDuplicatesWithinRemote(ctx context.Context, remot
 		FROM object_hash oh
 		JOIN object_hash_junction ohj ON oh.id = ohj.object_hash_id
 		JOIN object_meta om ON ohj.object_meta_id = om.id
-		JOIN object_remote_junction orj ON om.id = orj.object_meta_id
-		JOIN remote r ON orj.remote_id = r.id
-		JOIN location l ON r.location_id = l.id
-		%s
+		WHERE om.location_id = $1
 		%s
 		GROUP BY oh.hash_value, oh.hash_type
 		HAVING COUNT(DISTINCT om.id) > 1
 		ORDER BY duplicate_count DESC
 		%s;
-	`, queryClause, hashFilter, limitClause)
+	`, hashFilter, limitClause)
 
 	rows, err := r.db.Query(ctx, statement, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query duplicates within remote: %w", err)
+		return nil, fmt.Errorf("failed to query duplicates within location: %w", err)
 	}
 	defer rows.Close()
 
@@ -694,18 +528,37 @@ func (r *ObjectRepository) FindDuplicatesWithinRemote(ctx context.Context, remot
 	return groups, nil
 }
 
+// FindDuplicatesWithinRemote returns hashes shared by more than one file within
+// a specific location by looking up the location by name and type.
+// This is a convenience wrapper around FindDuplicatesWithinLocation.
+// Optionally filter by hashType (empty = all types).
+func (r *ObjectRepository) FindDuplicatesWithinRemote(ctx context.Context, locationName, hashType string, limit, offset int) ([]HashGroup, error) {
+	// Look up the location by name to get its ID
+	var locationId int
+	statement := `SELECT id FROM location WHERE name = $1 LIMIT 1`
+	row := r.db.QueryRow(ctx, statement, locationName)
+	err := row.Scan(&locationId)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			// No location found with this name
+			return []HashGroup{}, nil
+		}
+		return nil, fmt.Errorf("failed to find location by name %q: %w", locationName, err)
+	}
+
+	return r.FindDuplicatesWithinLocation(ctx, locationId, hashType, limit, offset)
+}
+
 // GetFilesByHash returns all files that share the given hash value and type.
 // Use minSize=0 to return files of any size.
 func (r *ObjectRepository) GetFilesByHash(ctx context.Context, hashValue, hashType string, minSize int64) ([]FileRecord, error) {
 	statement := `
 		SELECT om.id, om.object_name, om.object_path, om.object_mime_type, om.object_size,
-		       COALESCE(rem.remote_name, ''), COALESCE(l.name, ''), COALESCE(om.scan_root, '')
+		       om.location_id, om.absolute_path, COALESCE(l.name, ''), COALESCE(l.type, '')
 		FROM object_meta om
 		JOIN object_hash_junction ohj ON om.id = ohj.object_meta_id
 		JOIN object_hash oh ON ohj.object_hash_id = oh.id
-		LEFT JOIN object_remote_junction orj ON om.id = orj.object_meta_id
-		LEFT JOIN remote rem ON orj.remote_id = rem.id
-		LEFT JOIN location l ON rem.location_id = l.id
+		LEFT JOIN location l ON om.location_id = l.id
 		WHERE oh.hash_value = $1
 		  AND oh.hash_type = $2::hash_type_enum
 		  AND om.object_size >= $3;
@@ -720,7 +573,7 @@ func (r *ObjectRepository) GetFilesByHash(ctx context.Context, hashValue, hashTy
 	var records []FileRecord
 	for rows.Next() {
 		var f FileRecord
-		if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size, &f.RemoteName, &f.Hostname, &f.ScanRoot); err != nil {
+		if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size, &f.LocationId, &f.AbsolutePath, &f.LocationName, &f.LocationType); err != nil {
 			return nil, fmt.Errorf("failed to scan file record: %w", err)
 		}
 		records = append(records, f)
@@ -767,14 +620,12 @@ func (r *ObjectRepository) GetFilesByHashes(ctx context.Context, hashes []HashTy
 		// Build the WHERE clause for this batch: (hash_value, hash_type) IN (...)
 		statement := `
 			SELECT om.id, om.object_name, om.object_path, om.object_mime_type, om.object_size,
-			       COALESCE(rem.remote_name, ''), COALESCE(l.name, ''), COALESCE(om.scan_root, ''),
+			       om.location_id, om.absolute_path, COALESCE(l.name, ''), COALESCE(l.type, ''),
 			       oh.hash_value, oh.hash_type::text
 			FROM object_meta om
 			JOIN object_hash_junction ohj ON om.id = ohj.object_meta_id
 			JOIN object_hash oh ON ohj.object_hash_id = oh.id
-			LEFT JOIN object_remote_junction orj ON om.id = orj.object_meta_id
-			LEFT JOIN remote rem ON orj.remote_id = rem.id
-			LEFT JOIN location l ON rem.location_id = l.id
+			LEFT JOIN location l ON om.location_id = l.id
 			WHERE (oh.hash_value, oh.hash_type::text) IN (
 		`
 
@@ -803,7 +654,7 @@ func (r *ObjectRepository) GetFilesByHashes(ctx context.Context, hashes []HashTy
 		for rows.Next() {
 			var f FileRecord
 			var hashValue, hashType string
-			if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size, &f.RemoteName, &f.Hostname, &f.ScanRoot, &hashValue, &hashType); err != nil {
+			if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size, &f.LocationId, &f.AbsolutePath, &f.LocationName, &f.LocationType, &hashValue, &hashType); err != nil {
 				return nil, fmt.Errorf("failed to scan file record in batch: %w", err)
 			}
 			key := hashValue + ":" + hashType

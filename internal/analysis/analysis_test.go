@@ -36,8 +36,8 @@ func (m *mockRepo) GetFilesByHashes(_ context.Context, _ []repository.HashTypePa
 }
 
 var twoFiles = []repository.FileRecord{
-	{ID: 1, Name: "a.txt", Path: "/docs/a.txt", Size: 1024, RemoteName: "dbox:", Hostname: "host1"},
-	{ID: 2, Name: "a.txt", Path: "/backup/a.txt", Size: 1024, RemoteName: "s3:", Hostname: "host2"},
+	{ID: 1, Name: "a.txt", Path: "/docs/a.txt", Size: 1024, LocationId: 1, AbsolutePath: "/docs/a.txt", LocationName: "host1", LocationType: "local"},
+	{ID: 2, Name: "a.txt", Path: "/backup/a.txt", Size: 1024, LocationId: 2, AbsolutePath: "/backup/a.txt", LocationName: "host2", LocationType: "local"},
 }
 
 func TestFindAcrossRemotes_ReturnsDuplicateGroups(t *testing.T) {
@@ -142,8 +142,8 @@ func TestFormatReport_WithGroups(t *testing.T) {
 			HashType:  "md5",
 			Count:     2,
 			Files: []FileInfo{
-				{Name: "a.txt", Path: "/docs/a.txt", Size: 1024, RemoteName: "dbox:", Hostname: "host1"},
-				{Name: "a.txt", Path: "/backup/a.txt", Size: 1024, RemoteName: "s3:", Hostname: "host2"},
+				{Name: "a.txt", Path: "/docs/a.txt", Size: 1024, LocationId: 1, AbsolutePath: "/docs/a.txt", LocationName: "dbox", LocationType: "remote"},
+				{Name: "a.txt", Path: "/backup/a.txt", Size: 1024, LocationId: 2, AbsolutePath: "/backup/a.txt", LocationName: "s3", LocationType: "remote"},
 			},
 		},
 	}
@@ -162,12 +162,12 @@ func TestFindAcrossRemotes_UsesBatchQuery(t *testing.T) {
 	// Create a batch-ready map with multiple hash groups
 	filesMap := repository.FilesByHashMap{
 		"abc123:md5": {
-			{ID: 1, Name: "file1.txt", Path: "/path/file1.txt", Size: 1024, RemoteName: "dbox:", Hostname: "host1"},
-			{ID: 2, Name: "file1.txt", Path: "/backup/file1.txt", Size: 1024, RemoteName: "s3:", Hostname: "host2"},
+			{ID: 1, Name: "file1.txt", Path: "/path/file1.txt", Size: 1024, LocationId: 1, AbsolutePath: "/path/file1.txt", LocationName: "host1", LocationType: "local"},
+			{ID: 2, Name: "file1.txt", Path: "/backup/file1.txt", Size: 1024, LocationId: 2, AbsolutePath: "/backup/file1.txt", LocationName: "host2", LocationType: "local"},
 		},
 		"def456:sha256": {
-			{ID: 3, Name: "file2.pdf", Path: "/docs/file2.pdf", Size: 2048, RemoteName: "gdrive:", Hostname: "host1"},
-			{ID: 4, Name: "file2.pdf", Path: "/archive/file2.pdf", Size: 2048, RemoteName: "s3:", Hostname: "host2"},
+			{ID: 3, Name: "file2.pdf", Path: "/docs/file2.pdf", Size: 2048, LocationId: 1, AbsolutePath: "/docs/file2.pdf", LocationName: "host1", LocationType: "local"},
+			{ID: 4, Name: "file2.pdf", Path: "/archive/file2.pdf", Size: 2048, LocationId: 2, AbsolutePath: "/archive/file2.pdf", LocationName: "host2", LocationType: "local"},
 		},
 	}
 
@@ -206,11 +206,11 @@ func TestFindAcrossRemotes_BatchQueryWithMinSize(t *testing.T) {
 	// Simulate: 2 hash groups, but one ends up with only 1 file after min-size filter
 	filesMap := repository.FilesByHashMap{
 		"abc123:md5": {
-			{ID: 1, Name: "large.bin", Path: "/large.bin", Size: 5000, RemoteName: "dbox:", Hostname: "host1"},
-			{ID: 2, Name: "large.bin", Path: "/backup/large.bin", Size: 5000, RemoteName: "s3:", Hostname: "host2"},
+			{ID: 1, Name: "large.bin", Path: "/large.bin", Size: 5000, LocationId: 1, AbsolutePath: "/large.bin", LocationName: "dbox", LocationType: "remote"},
+			{ID: 2, Name: "large.bin", Path: "/backup/large.bin", Size: 5000, LocationId: 2, AbsolutePath: "/backup/large.bin", LocationName: "s3", LocationType: "remote"},
 		},
 		"small123:md5": {
-			{ID: 3, Name: "tiny.txt", Path: "/tiny.txt", Size: 100, RemoteName: "dbox:", Hostname: "host1"},
+			{ID: 3, Name: "tiny.txt", Path: "/tiny.txt", Size: 100, LocationId: 1, AbsolutePath: "/tiny.txt", LocationName: "dbox", LocationType: "remote"},
 			// Second file filtered out by minSize, so only 1 remains
 		},
 	}
@@ -257,8 +257,8 @@ func TestFindAcrossRemotes_BatchQueryBatchError(t *testing.T) {
 func TestFindWithinRemote_UsesBatchQuery(t *testing.T) {
 	filesMap := repository.FilesByHashMap{
 		"xyz789:sha1": {
-			{ID: 1, Name: "doc.docx", Path: "/doc.docx", Size: 50000, RemoteName: "dbox:"},
-			{ID: 2, Name: "doc.docx", Path: "/archives/doc.docx", Size: 50000, RemoteName: "dbox:"},
+			{ID: 1, Name: "doc.docx", Path: "/doc.docx", Size: 50000, LocationId: 1, AbsolutePath: "/doc.docx", LocationName: "dbox", LocationType: "remote"},
+			{ID: 2, Name: "doc.docx", Path: "/archives/doc.docx", Size: 50000, LocationId: 1, AbsolutePath: "/archives/doc.docx", LocationName: "dbox", LocationType: "remote"},
 		},
 	}
 

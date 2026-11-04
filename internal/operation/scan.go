@@ -70,6 +70,13 @@ func WithScanRoot(root string) ScannerOpt {
 
 // Scan handles scanning of a remote
 func Scan(ctx context.Context, s *Scanner, lc rclone.ListConfig) error {
+	// On first call, ensure location exists for this remote
+	if s.Remote.Location.Id == 0 {
+		if err := s.Repo.EnsureLocation(ctx, &s.Remote.Location); err != nil {
+			return fmt.Errorf("failed to ensure location: %w", err)
+		}
+	}
+
 	// construct initial options, eg path
 	lr, err := rclone.ListJSON(ctx, lc)
 	if err != nil {
@@ -94,7 +101,18 @@ func Scan(ctx context.Context, s *Scanner, lc rclone.ListConfig) error {
 		// do files iteration and persistence
 		for _, lri := range lr.List {
 			fmt.Printf("Found file: %s\n", lri)
-			err := s.Repo.PersistResult(ctx, s.Remote, lri, s.ScanRoot)
+
+			// Build Meta with LocationId and AbsolutePath set
+			// rclone absolute path format: remote_name:path
+			absolutePath := s.Remote.Name + ":" + lri.Path
+			meta := object.NewMeta(lri.Name, lri.Path, lri.MimeType,
+				object.WithMetaSize(lri.Size),
+				object.WithMetaScanRoot(s.ScanRoot),
+				object.WithMetaLocationId(s.Remote.LocationId),
+				object.WithMetaAbsolutePath(absolutePath))
+
+			// Persist meta and hashes
+			err := s.persistRcloneFile(ctx, &meta, lri.Hashes)
 			if err != nil {
 				return fmt.Errorf("failed to persist: %w", err)
 			}
@@ -106,5 +124,51 @@ func Scan(ctx context.Context, s *Scanner, lc rclone.ListConfig) error {
 			return fmt.Errorf("failed scan: %w", err)
 		}
 	}
+	return nil
+}
+
+// persistRcloneFile persists a single rclone file with its hashes
+func (s *Scanner) persistRcloneFile(ctx context.Context, m *object.Meta, hashes map[string]string) error {
+	// Check if meta already persisted
+	err := s.Repo.ReadMeta(ctx, m)
+	if err != nil {
+		return fmt.Errorf("failed to get object meta from db: %w", err)
+	}
+	if !m.Persisted {
+		err = s.Repo.WriteMeta(ctx, m)
+		if err != nil {
+			return fmt.Errorf("failed to put object into db: %w", err)
+		}
+	}
+
+	// Persist hashes
+	for hType, hVal := range hashes {
+		h := object.NewHash(hVal, hType)
+
+		err := s.Repo.ReadHash(ctx, &h)
+		if err != nil {
+			return fmt.Errorf("failed to get hash from db: %w", err)
+		}
+		if !h.Persisted {
+			err = s.Repo.WriteHash(ctx, &h)
+			if err != nil {
+				return fmt.Errorf("failed to put hash into db: %w", err)
+			}
+		}
+
+		// Link meta to hash
+		mhj := object.NewMetaHashJunction(m.Id, h.Id)
+		err = s.Repo.ReadMetaHashJunction(ctx, &mhj)
+		if err != nil {
+			return fmt.Errorf("failed to get object meta hash junction from db: %w", err)
+		}
+		if !mhj.Persisted {
+			err = s.Repo.WriteMetaHashJunction(ctx, &mhj)
+			if err != nil {
+				return fmt.Errorf("failed to set object meta-hash junction in db: %w", err)
+			}
+		}
+	}
+
 	return nil
 }
