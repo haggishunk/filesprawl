@@ -423,33 +423,43 @@ func (m *ConsolidationModel) handleAction(action string) {
 	}
 }
 
-// constructFilePath builds the full filepath for opening/previewing a file
-// Local files: RemoteName is the canonical local path, append relative Path
-// Rclone files: RemoteName:Path
+// constructFilePath builds the full filepath for opening/previewing a file.
+//
+// LOCAL FILES (ScanRoot set):
+//
+//	Display: hostname | filename | /full/canonical/path
+//	Accessor: /full/canonical/path (pass directly to system viewer)
+//
+// REMOTE FILES (ScanRoot null):
+//
+//	Display: remote_name | filename | path/within/remote
+//	Accessor: remote_name:path/within/remote (pass to rclone)
 func (m *ConsolidationModel) constructFilePath(version *browsing.FileVersion) string {
 	if version == nil || version.FileInfo == nil {
 		return ""
 	}
 
-	// Determine if this is a local or rclone file based on whether ScanRoot is set
-	// (local files have scan_root, rclone files have scan_root = NULL)
-	if version.FileInfo.ScanRoot != "" {
-		// Local file: RemoteName is the canonical full path root
-		// Path is the relative path within that root
-		// Example: RemoteName="/mnt/data", Path="photos/IMG_0587.MOV"
-		// Result: "/mnt/data/photos/IMG_0587.MOV"
-		if version.FileInfo.Path == "" {
-			return version.RemoteName
+	isLocal := version.FileInfo.ScanRoot != ""
+
+	if isLocal {
+		// Local file: return full canonical path for direct file access
+		// Example: "/mnt/data/photos/IMG_0587.MOV"
+		if version.RemoteName != "" {
+			if version.FileInfo.Path == "" {
+				return version.RemoteName
+			}
+			return fmt.Sprintf("%s/%s", version.RemoteName, version.FileInfo.Path)
 		}
-		return fmt.Sprintf("%s/%s", version.RemoteName, version.FileInfo.Path)
+		return version.FileInfo.Path
 	}
 
-	// Rclone file: RemoteName is the rclone remote identifier
-	// Path is the path within the remote
-	// Example: RemoteName="goblet", Path="photos/IMG_0587.MOV"
-	// Result: "goblet:photos/IMG_0587.MOV"
+	// Rclone file: return remote:path format for rclone access
+	// Example: "goblet:photos/IMG_0587.MOV"
 	if version.RemoteName != "" && version.FileInfo.Path != "" {
 		return fmt.Sprintf("%s:%s", version.RemoteName, version.FileInfo.Path)
+	}
+	if version.RemoteName != "" {
+		return version.RemoteName
 	}
 
 	// Fallback
