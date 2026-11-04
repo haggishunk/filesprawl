@@ -90,7 +90,7 @@ func (lp *ListPane) Render() string {
 	if lp.focused {
 		headerChar = "═"
 	}
-	header := fmt.Sprintf("┌%s HASH LIST %s┐\n", strings.Repeat(headerChar, 1), strings.Repeat(headerChar, 20))
+	header := fmt.Sprintf("┌%s DUPLICATE GROUPS %s┐\n", strings.Repeat(headerChar, 1), strings.Repeat(headerChar, 17))
 	buf.WriteString(header)
 
 	// Calculate which groups to show
