@@ -186,6 +186,7 @@ func (m *ConsolidationModel) View() string {
 
 	// Render status bar
 	if m.statusBar != nil {
+		m.statusBar.SetFocusedPane(m.focusedPane)
 		result.WriteString(m.statusBar.Render())
 	}
 
