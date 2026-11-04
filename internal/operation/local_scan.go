@@ -168,13 +168,19 @@ func persistLocalSymlink(ctx context.Context, ls *LocalScanner, scanRoot string,
 	return ls.Repo.PersistLocalResult(ctx, &rem, &meta, nil)
 }
 
-// localRemote builds the persistence identity of a local scan root
+// localRemote builds the persistence identity of a local scan root.
+// For local scans:
+//
+//	Location: hostname (identifies the machine)
+//	RemoteName: hostname (same as location, identifies source)
+//	ScanRoot: the directory where scan started (used as filter, not identifier)
 func localRemote(scanRoot string) (remote.Remote, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return remote.Remote{}, fmt.Errorf("failed to get hostname: %w", err)
 	}
-	return remote.NewLocalRemote(hostname, scanRoot), nil
+	// Store hostname as both the location and remote_name
+	return remote.NewLocalRemote(hostname, hostname), nil
 }
 
 func computeHashes(file *os.File, hashes map[string]string) error {
