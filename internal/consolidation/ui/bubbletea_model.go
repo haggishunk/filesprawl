@@ -20,12 +20,13 @@ type ConsolidationModel struct {
 	flagManager    *browsing.PersistentFlagManager
 
 	// UI state
-	selectedIndex int    // Currently selected duplicate group
-	isHashView    bool   // true = hash view, false = filename view
-	modalType     string // Current modal being shown ("" = none)
-	focusedPane   string // "list" or "table" - which pane has focus
-	width         int    // Terminal width
-	height        int    // Terminal height
+	selectedIndex       int    // Currently selected duplicate group
+	isHashView          bool   // true = hash view, false = filename view
+	modalType           string // Current modal being shown ("" = none)
+	focusedPane         string // "list", "hash_table", or "filename_table" - which pane has focus
+	width               int    // Terminal width
+	height              int    // Terminal height
+	showFilenamePaneVal bool   // Whether to show the lower right filename pane
 
 	// Settings
 	version    string
@@ -36,12 +37,14 @@ type ConsolidationModel struct {
 	duplicateGroups []browsing.DuplicateGroup
 
 	// Components
-	listPane      *components.ListPane
-	tablePane     *components.TablePane
-	banner        *components.Banner
-	statusBar     *components.StatusBar
-	safetyChecker *components.SafetyChecker
-	helpModal     *components.HelpModal
+	listPane          *components.ListPane
+	hashTablePane     *components.TablePane         // Upper right: hash-grouped files
+	filenameTablePane *components.FilenameTablePane // Lower right: filename-grouped files
+	banner            *components.Banner
+	statusBar         *components.StatusBar
+	safetyChecker     *components.SafetyChecker
+	helpModal         *components.HelpModal
+	filenameGroups    []browsing.DuplicateGroup // Filename groups for display
 
 	// UI feedback
 	lastError string // Last error message to display
@@ -58,32 +61,35 @@ func NewConsolidationModel(
 	remotes []string,
 ) *ConsolidationModel {
 	model := &ConsolidationModel{
-		ctx:             ctx,
-		sessionManager:  sessionManager,
-		flagManager:     flagManager,
-		duplicateGroups: duplicateGroups,
-		selectedIndex:   0,
-		isHashView:      true,
-		focusedPane:     "list", // Start with list pane focused
-		modalType:       "",
-		width:           80,
-		height:          24,
-		version:         version,
-		reviewMode:      reviewMode,
-		remotes:         remotes,
+		ctx:                 ctx,
+		sessionManager:      sessionManager,
+		flagManager:         flagManager,
+		duplicateGroups:     duplicateGroups,
+		selectedIndex:       0,
+		isHashView:          true,
+		focusedPane:         "list", // Start with list pane focused
+		modalType:           "",
+		width:               80,
+		height:              24,
+		version:             version,
+		reviewMode:          reviewMode,
+		remotes:             remotes,
+		showFilenamePaneVal: true,                        // Show filename pane by default
+		filenameGroups:      []browsing.DuplicateGroup{}, // Will be loaded later
 	}
 
 	// Initialize components
 	model.listPane = components.NewListPane(duplicateGroups, 40, 20)
-	model.tablePane = components.NewTablePane(60, 20, flagManager)
+	model.hashTablePane = components.NewTablePane(60, 20, flagManager)
+	model.filenameTablePane = components.NewFilenameTablePane(60, 20, flagManager)
 	model.banner = components.NewBanner(version, len(duplicateGroups), reviewMode, remotes, 80)
 	model.statusBar = components.NewStatusBar(80)
 	model.safetyChecker = components.NewSafetyChecker(flagManager)
 	model.helpModal = components.NewHelpModal(80, 24)
 
-	// Set initial group in table
+	// Set initial group in hash table pane
 	if len(duplicateGroups) > 0 {
-		model.tablePane.SetGroup(&duplicateGroups[0])
+		model.hashTablePane.SetGroup(&duplicateGroups[0])
 	}
 
 	return model
@@ -102,16 +108,33 @@ func (m *ConsolidationModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// Update component dimensions (40% left, 60% right)
+		// Update component dimensions (40% left, 60% right split vertically)
 		leftWidth := (m.width * 40) / 100
 		rightWidth := m.width - leftWidth - 2 // Account for borders
 		panelHeight := m.height - 4
+
 		if m.listPane != nil {
 			m.listPane.SetDimensions(leftWidth, panelHeight)
 		}
-		if m.tablePane != nil {
-			m.tablePane.SetDimensions(rightWidth, panelHeight)
+
+		// Right side is split vertically: hash pane on top, filename pane on bottom
+		if m.showFilenamePaneVal && panelHeight > 6 {
+			// Split vertically
+			hashPaneH := panelHeight / 2
+			filenamePaneH := panelHeight - hashPaneH - 1 // -1 for divider
+			if m.hashTablePane != nil {
+				m.hashTablePane.SetDimensions(rightWidth, hashPaneH)
+			}
+			if m.filenameTablePane != nil {
+				m.filenameTablePane.SetDimensions(rightWidth, filenamePaneH)
+			}
+		} else {
+			// Only show hash pane, full height
+			if m.hashTablePane != nil {
+				m.hashTablePane.SetDimensions(rightWidth, panelHeight)
+			}
 		}
+
 		if m.banner != nil {
 			m.banner.SetDimensions(m.width)
 		}
@@ -173,21 +196,40 @@ func (m *ConsolidationModel) View() string {
 	if m.listPane != nil {
 		m.listPane.SetFocus(m.focusedPane == "list")
 	}
-	if m.tablePane != nil {
-		m.tablePane.SetFocus(m.focusedPane == "table")
+	if m.hashTablePane != nil {
+		m.hashTablePane.SetFocus(m.focusedPane == "hash_table")
+	}
+	if m.filenameTablePane != nil {
+		m.filenameTablePane.SetFocus(m.focusedPane == "filename_table")
 	}
 
-	// Render panes side-by-side
-	var listView, tableView string
+	// Render list pane
+	var listView string
 	if m.listPane != nil {
 		listView = m.listPane.Render()
 	}
-	if m.tablePane != nil {
-		tableView = m.tablePane.Render()
+
+	// Render right side panes (vertically split or single)
+	var rightPanelsView string
+	if m.showFilenamePaneVal {
+		// Both hash and filename panes visible - render vertically split
+		var hashTableView, filenameTableView string
+		if m.hashTablePane != nil {
+			hashTableView = m.hashTablePane.Render()
+		}
+		if m.filenameTablePane != nil {
+			filenameTableView = m.filenameTablePane.Render()
+		}
+		rightPanelsView = m.combineRightPanels(hashTableView, filenameTableView)
+	} else {
+		// Only hash pane visible
+		if m.hashTablePane != nil {
+			rightPanelsView = m.hashTablePane.Render()
+		}
 	}
 
-	// Combine panes horizontally
-	panelsView := m.combinePanels(listView, tableView)
+	// Combine left and right panes horizontally
+	panelsView := m.combinePanels(listView, rightPanelsView)
 	result.WriteString(panelsView)
 
 	// Render error message if present
@@ -204,7 +246,7 @@ func (m *ConsolidationModel) View() string {
 	return result.String()
 }
 
-// combinePanels combines two pane views side-by-side
+// combinePanels combines two pane views side-by-side (left + right)
 func (m *ConsolidationModel) combinePanels(leftPane, rightPane string) string {
 	leftLines := strings.Split(leftPane, "\n")
 	rightLines := strings.Split(rightPane, "\n")
@@ -233,6 +275,18 @@ func (m *ConsolidationModel) combinePanels(leftPane, rightPane string) string {
 	return result.String()
 }
 
+// combineRightPanels combines hash and filename panes vertically (top + bottom)
+func (m *ConsolidationModel) combineRightPanels(hashPane, filenamePane string) string {
+	// Simply stack vertically with a divider line between them
+	// The panes themselves handle their rendering, we just concatenate
+	var result strings.Builder
+	result.WriteString(hashPane)
+	// Add a divider line - simple horizontal line
+	result.WriteString("─────────────────────────────────────────────────────────────────\n")
+	result.WriteString(filenamePane)
+	return result.String()
+}
+
 // handleKey processes keyboard input
 func (m *ConsolidationModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// If help modal is open, close it on any key (except q for quit)
@@ -246,85 +300,123 @@ func (m *ConsolidationModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.String() {
 	case "tab":
-		// Switch focus between panes
-		if m.focusedPane == "list" {
-			m.focusedPane = "table"
-		} else {
+		// Switch focus between panes (cycle through: list -> hash_table -> filename_table -> list)
+		switch m.focusedPane {
+		case "list":
+			m.focusedPane = "hash_table"
+		case "hash_table":
+			if m.showFilenamePaneVal {
+				m.focusedPane = "filename_table"
+			} else {
+				m.focusedPane = "list"
+			}
+		case "filename_table":
+			m.focusedPane = "list"
+		default:
 			m.focusedPane = "list"
 		}
 	case "shift+tab":
-		// Switch focus between panes (reverse)
-		if m.focusedPane == "list" {
-			m.focusedPane = "table"
-		} else {
+		// Switch focus between panes (reverse cycle)
+		switch m.focusedPane {
+		case "list":
+			if m.showFilenamePaneVal {
+				m.focusedPane = "filename_table"
+			} else {
+				m.focusedPane = "hash_table"
+			}
+		case "hash_table":
+			m.focusedPane = "list"
+		case "filename_table":
+			m.focusedPane = "hash_table"
+		default:
 			m.focusedPane = "list"
 		}
 	case "j":
 		// Navigate down in focused pane
-		if m.focusedPane == "list" {
+		switch m.focusedPane {
+		case "list":
 			if m.listPane != nil {
 				m.listPane.SelectionDown()
 				m.selectedIndex = m.listPane.GetSelectedIndex()
-				m.updateTablePane()
+				m.updateHashTablePane()
 			}
-		} else {
-			// Navigate in table
-			if m.tablePane != nil {
-				m.tablePane.SelectionDown()
+		case "hash_table":
+			if m.hashTablePane != nil {
+				m.hashTablePane.SelectionDown()
+			}
+		case "filename_table":
+			if m.filenameTablePane != nil {
+				m.filenameTablePane.SelectionDown()
 			}
 		}
 	case "k":
 		// Navigate up in focused pane
-		if m.focusedPane == "list" {
+		switch m.focusedPane {
+		case "list":
 			if m.listPane != nil {
 				m.listPane.SelectionUp()
 				m.selectedIndex = m.listPane.GetSelectedIndex()
-				m.updateTablePane()
+				m.updateHashTablePane()
 			}
-		} else {
-			// Navigate in table
-			if m.tablePane != nil {
-				m.tablePane.SelectionUp()
+		case "hash_table":
+			if m.hashTablePane != nil {
+				m.hashTablePane.SelectionUp()
+			}
+		case "filename_table":
+			if m.filenameTablePane != nil {
+				m.filenameTablePane.SelectionUp()
 			}
 		}
 	case "w":
-		// Toggle wide view in table pane (only works when table is focused)
-		if m.focusedPane == "table" && m.tablePane != nil {
-			m.tablePane.ToggleWideView()
+		// Toggle filename pane visibility
+		m.ToggleFilenamePaneVisibility()
+		// Adjust focus if needed: if filename pane is hidden and focused, move to hash_table
+		if !m.showFilenamePaneVal && m.focusedPane == "filename_table" {
+			m.focusedPane = "hash_table"
 		}
 	case "v":
-		// Open file for preview (only in table pane)
-		if m.focusedPane == "table" && m.tablePane != nil {
-			selectedFile := m.tablePane.GetSelectedFile()
-			if selectedFile != nil && selectedFile.FileInfo != nil {
-				// Construct full filepath for preview
-				fullPath := m.constructFilePath(selectedFile)
-				if fullPath != "" {
-					// TODO: Open file with system viewer (e.g., less, vim, etc.)
-					m.lastError = fmt.Sprintf("📁 Preview: %s", fullPath)
-				} else {
-					m.lastError = "❌ Cannot construct file path"
-				}
+		// Toggle wide view in focused table pane
+		if m.focusedPane == "hash_table" && m.hashTablePane != nil {
+			m.hashTablePane.ToggleWideView()
+		} else if m.focusedPane == "filename_table" && m.filenameTablePane != nil {
+			m.filenameTablePane.ToggleWideView()
+		}
+	case "p":
+		// Open file for preview (only in table panes)
+		var selectedFile *browsing.FileVersion
+		if m.focusedPane == "hash_table" && m.hashTablePane != nil {
+			selectedFile = m.hashTablePane.GetSelectedFile()
+		} else if m.focusedPane == "filename_table" && m.filenameTablePane != nil {
+			selectedFile = m.filenameTablePane.GetSelectedFile()
+		}
+		if selectedFile != nil && selectedFile.FileInfo != nil {
+			// Construct full filepath for preview
+			fullPath := m.constructFilePath(selectedFile)
+			if fullPath != "" {
+				// TODO: Open file with system viewer (e.g., less, vim, etc.)
+				m.lastError = fmt.Sprintf("📁 Preview: %s", fullPath)
+			} else {
+				m.lastError = "❌ Cannot construct file path"
 			}
 		}
 	case "K":
-		// Flag as KEEP (only in table pane)
-		if m.focusedPane == "table" && m.tablePane != nil {
+		// Flag as KEEP (only in table panes)
+		if m.focusedPane == "hash_table" || m.focusedPane == "filename_table" {
 			m.handleAction("keep")
 		}
 	case "a":
-		// Flag as ARCHIVE (only in table pane)
-		if m.focusedPane == "table" && m.tablePane != nil {
+		// Flag as ARCHIVE (only in table panes)
+		if m.focusedPane == "hash_table" || m.focusedPane == "filename_table" {
 			m.handleAction("archive")
 		}
 	case "d":
-		// Flag as DELETE (only in table pane)
-		if m.focusedPane == "table" && m.tablePane != nil {
+		// Flag as DELETE (only in table panes)
+		if m.focusedPane == "hash_table" || m.focusedPane == "filename_table" {
 			m.handleAction("delete")
 		}
 	case "s":
-		// Flag as SKIP (only in table pane)
-		if m.focusedPane == "table" && m.tablePane != nil {
+		// Flag as SKIP (only in table panes)
+		if m.focusedPane == "hash_table" || m.focusedPane == "filename_table" {
 			m.handleAction("skip")
 		}
 	case "?":
@@ -337,12 +429,12 @@ func (m *ConsolidationModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// updateTablePane updates the table pane with the currently selected group
-func (m *ConsolidationModel) updateTablePane() {
-	if m.listPane != nil && m.tablePane != nil {
+// updateHashTablePane updates the hash table pane with the currently selected group
+func (m *ConsolidationModel) updateHashTablePane() {
+	if m.listPane != nil && m.hashTablePane != nil {
 		selectedGroup := m.listPane.GetSelectedGroup()
 		if selectedGroup != nil {
-			m.tablePane.SetGroup(selectedGroup)
+			m.hashTablePane.SetGroup(selectedGroup)
 		}
 	}
 }
@@ -362,12 +454,18 @@ func (m *ConsolidationModel) handleScroll(direction string) {
 
 // handleAction processes user actions (K/a/d/s flags)
 func (m *ConsolidationModel) handleAction(action string) {
-	if m.tablePane == nil || m.flagManager == nil {
+	if m.flagManager == nil {
 		return
 	}
 
-	// Get the currently selected file
-	version := m.tablePane.GetSelectedFile()
+	// Get the currently selected file from the focused pane
+	var version *browsing.FileVersion
+	if m.focusedPane == "hash_table" && m.hashTablePane != nil {
+		version = m.hashTablePane.GetSelectedFile()
+	} else if m.focusedPane == "filename_table" && m.filenameTablePane != nil {
+		version = m.filenameTablePane.GetSelectedFile()
+	}
+
 	if version == nil {
 		m.lastError = "No file selected"
 		return
@@ -448,6 +546,25 @@ func (m *ConsolidationModel) constructFilePath(version *browsing.FileVersion) st
 
 	// Fallback if AbsolutePath not set
 	return version.FileInfo.Path
+}
+
+// SetFilenameGroups loads filename-based duplicate groups for display
+func (m *ConsolidationModel) SetFilenameGroups(groups []browsing.DuplicateGroup) {
+	m.filenameGroups = groups
+	if len(groups) > 0 && m.filenameTablePane != nil {
+		m.filenameTablePane.SetGroup(&groups[0])
+	}
+}
+
+// ToggleFilenamePaneVisibility toggles whether the filename pane is shown
+func (m *ConsolidationModel) ToggleFilenamePaneVisibility() {
+	m.showFilenamePaneVal = !m.showFilenamePaneVal
+	// Focus cycling updates handled in navigation logic
+}
+
+// IsFilenamePaneVisible returns whether the filename pane should be displayed
+func (m *ConsolidationModel) IsFilenamePaneVisible() bool {
+	return m.showFilenamePaneVal
 }
 
 // showHelp displays help
