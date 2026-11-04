@@ -41,9 +41,3 @@ jobs:
 
           # Run hk on files changed in this PR
           hk run pre-commit --from-ref "origin/$BASE_REF" --to-ref HEAD --check
-
-      - name: Comment on PR if checks fail
-        if: failure()
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
-        with:
-          body: ❌ hk pre-commit checks failed. Please run `hk run pre-commit --fix --all` locally and push the changes.
