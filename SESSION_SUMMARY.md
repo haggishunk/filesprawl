@@ -1,11 +1,13 @@
 # Filesprawl Session Summary
 
 ## Overview
+
 This session focused on evaluating and completing duplicate detection features, as well as implementing local file scanning and locality interface capabilities.
 
 ## Completed Work
 
 ### 1. Add Local File Scanning ✅ NEW
+
 - **Status**: Fully implemented and tested
 - **Files Created**:
   - `internal/operation/local_scan.go` — LocalScanner with filesystem traversal
@@ -20,6 +22,7 @@ This session focused on evaluating and completing duplicate detection features, 
 - **OpenSpec**: Validates successfully ✅
 
 ### 2. Add Locality Interface ✅ NEW
+
 - **Status**: Fully implemented and tested
 - **Files Created**:
   - `internal/locality/mapping.go` — Path resolution engine
@@ -35,6 +38,7 @@ This session focused on evaluating and completing duplicate detection features, 
 - **OpenSpec**: Validates successfully ✅
 
 ### 3. Evaluate Duplicate Features ✅ COMPLETED
+
 - **add-duplicate-detection**: Already complete and working
 - **add-duplicates-cli**: Fully implemented but task list was outdated
   - Updated `tasks.md` with all 42 items marked complete
@@ -44,6 +48,7 @@ This session focused on evaluating and completing duplicate detection features, 
 - **OpenSpec**: Both validate successfully ✅
 
 ### 4. Documentation Updates
+
 - **README.md**: Added sections for:
   - Local file indexing (scan-local command)
   - Locality interface usage (resolve-remote, resolve-local)
@@ -52,6 +57,7 @@ This session focused on evaluating and completing duplicate detection features, 
 - **Session summary**: This document
 
 ## Test Results
+
 ```
 go test ./...
   ✓ cmd/filesprawl
@@ -62,11 +68,12 @@ go test ./...
   ✓ internal/rclone
   ✓ internal/remote
   ✓ internal/repository
-  
+
 Total: 100% passing (26 tests)
 ```
 
 ## Project Status Update
+
 ```
 add-duplicate-detection          ✓ Complete
 add-duplicates-cli              ✓ Complete (was: 0/42)
@@ -83,6 +90,7 @@ update-golang-version           0/11 tasks
 ```
 
 ## Key Achievements
+
 1. ✅ Local file scanning fully operational
 2. ✅ Locality mapping system implemented
 3. ✅ Duplicate features documented and task list corrected
@@ -92,6 +100,7 @@ update-golang-version           0/11 tasks
 7. ✅ Security: Local scanning uses direct filesystem (no rclone)
 
 ## Next Steps
+
 1. Three high-progress features could be completed next:
    - add-release-pipeline (23/24 — nearly done)
    - migrate-to-cobra-cli (50/73)

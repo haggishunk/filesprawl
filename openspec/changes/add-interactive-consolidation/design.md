@@ -1,7 +1,9 @@
 # Design: Interactive Duplicate Consolidation
 
 ## Context
+
 Users have large numbers of duplicates across multiple remotes (e.g., 57k+ groups). The consolidation workflow must be:
+
 1. **Interactive** — preview files, make informed decisions per-group or in batch
 2. **Reversible** — archive instead of delete; preserve original paths for recovery
 3. **Learnable** — remember user preferences to accelerate bulk consolidation
@@ -9,17 +11,20 @@ Users have large numbers of duplicates across multiple remotes (e.g., 57k+ group
 5. **Integrable** — leverage existing photo metadata (DigiKam) when available
 
 ## Goals
+
 - Enable visual verification of duplicates before consolidation (critical for photo/media)
 - Reduce manual per-file decisions via smart preference memory
 - Support archive-first workflows with path preservation
 - Optional photo metadata integration (DigiKam) for intelligent selection
 
 ## Non-Goals
+
 - Permanent deletion (archiving is the final step, deletions are manual)
 - Real-time sync across remotes
 - Full media player integration (previews only; actual viewing external)
 
 ## Decisions
+
 1. **Archive Strategy**: Copy to archive location preserving directory structure; delete source only after user confirmation
 2. **Preferences**: Store consolidation decisions (per-remote, per-duplicate-pattern) in database; enable batch re-application
 3. **Preview**: Lightweight image thumbnails (100x100px) embedded in ANSI terminal or external viewer option
@@ -40,6 +45,7 @@ Users have large numbers of duplicates across multiple remotes (e.g., 57k+ group
 12. **Multi-User Review**: Second user can review and confirm/modify first user's flags with full audit trail before execution
 
 ## Risks
+
 - **Large batches**: 118k+ groups could overwhelm terminal. Mitigation: paginate, batch mode, progress bars
 - **Path collisions**: Archives may have path conflicts across remotes. Mitigation: prefix with remote name / hash
 - **Rclone performance**: Moving files via RC API could be slow. Mitigation: batch operations, async support
@@ -48,36 +54,43 @@ Users have large numbers of duplicates across multiple remotes (e.g., 57k+ group
 ## Data Loss Prevention Architecture
 
 ### Layer 1: Name Collision Detection
+
 - Query: Find files with identical object_name but different MD5 hashes
 - Display: Show count of unique variants, status (all preserved / some missing / critical loss)
 - Action: Flag for user review, recommend hash-based (not filename-based) consolidation
 - Source: `db/scripts/detect_name_collisions.sql`
 
 ### Layer 2: Completeness Verification
+
 - Query: For each file hash in duplicate group, count zero-byte vs non-zero copies
 - Display: Show status by location (0-byte safe, non-zero verified, missing copies flagged)
 - Action: Block consolidation if non-zero copy not found elsewhere
 - Source: Hash-based queries in repository layer during consolidation analysis
 
 ### Layer 3: Directory Safety Check
+
 - Query: For target consolidation directory, verify all files have copies elsewhere (by hash)
 - Display: Categorize as safe (copies elsewhere), zero-byte (corrupted), or risky (only copy)
 - Action: Block consolidation if risky files detected; require explicit override
 - Source: `db/scripts/check_directory_deletion_safety.sql`
 
 ### Safety Panel Display
+
 During interactive consolidation, present one-page safety summary:
+
 ```
 📋 Group Summary: N copies across M remotes
 🔗 Filename Status: ✅/⚠️/🚨 (X unique versions)
 💾 Completeness: ✅/⚠️/🚨 (X zero-byte, Y complete)
 📂 Directory Safety: ✅/⚠️/🚨 (X safe, Y risky)
 ```
+
 User can expand each section for details before confirming consolidation.
 
 ## Dual-View Browsing Interface Architecture
 
 ### Hash-Centric View (Browse by Content)
+
 ```
 View: By Hash (47 total copies)
 ═══════════════════════════════════════════
@@ -100,6 +113,7 @@ Hash abc123... (47 copies)  [Expand ▼]
 **Use Case**: "Is this file backed up well enough to delete one copy?"
 
 ### Filename-Centric View (Browse by Name)
+
 ```
 View: By Filename (118k files with variants)
 ═══════════════════════════════════════════
@@ -124,11 +138,13 @@ photo.jpg (5 different versions)  [Expand ▼]
 **Use Case**: "Which version of photo.jpg should I keep?"
 
 ### Location Presence Indicators
+
 - 🟢 **Green**: Multiple copies across locations (safe to delete one)
 - 🟡 **Yellow**: Limited replication (only 1-2 locations, recommend backup)
 - 🔴 **Red**: Only copy in entire system (CRITICAL - no backup exists!)
 
 ### Decision State Machine per File
+
 ```
 ┌─────────────────────────────────────┐
 │          Initial State               │
@@ -149,6 +165,7 @@ photo.jpg (5 different versions)  [Expand ▼]
 ```
 
 User can:
+
 - Flag individual files with keyboard shortcuts
 - Toggle flags while browsing
 - View summary grouped by action (KEEP/ARCHIVE/DELETE)
@@ -156,6 +173,7 @@ User can:
 - Execute consolidation only on flagged files
 
 ### Data Model for Browsing State
+
 ```
 type ConsolidationSession {
   DuplicateGroup duplicates
@@ -169,13 +187,16 @@ type ConsolidationSession {
 ## Multi-User Persistence Architecture
 
 ### User Management
+
 - Simple username-based authentication (no passwords)
 - Users created on-demand at session start
 - Stored in database: `consolidation_users` table
   - `id`, `username`, `created_at`, `last_active`
 
 ### Consolidation Flagging Persistence
+
 Database table: `consolidation_flags`
+
 ```
 id              INTEGER PRIMARY KEY
 file_id         INTEGER REFERENCES object_meta(id)
@@ -187,7 +208,9 @@ archive_dest    TEXT (if flag_type = ARCHIVE)
 ```
 
 ### Review Trail Architecture
+
 Database table: `consolidation_reviews`
+
 ```
 id              INTEGER PRIMARY KEY
 file_id         INTEGER REFERENCES object_meta(id)
@@ -201,6 +224,7 @@ review_reason   TEXT
 ```
 
 ### Session Workflow State Machine
+
 ```
 START
   ↓
@@ -222,6 +246,7 @@ START
 ```
 
 ### Multi-User Review Workflow
+
 ```
 Day 1: alice flags 47 files (persisted)
   ↓
@@ -236,9 +261,13 @@ Charlie logs in, sees alice's + bob's review trail
 ```
 
 ### Data Guarantees
+
 - ✅ All flags persisted immediately (no data loss)
 - ✅ Complete audit trail (who flagged what, when)
 - ✅ Review trail (modifications tracked)
 - ✅ Multi-user consensus before execution
 - ✅ No execution without final review confirmation
+
+```
+
 ```

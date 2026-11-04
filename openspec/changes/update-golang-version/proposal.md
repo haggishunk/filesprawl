@@ -1,6 +1,7 @@
 # Change: Upgrade Go toolchain to 1.26
 
 ## Why
+
 The project currently targets Go 1.21.3 (released October 2023), which has been
 out of the two-release support window since Go 1.23 shipped. Go 1.26 (released
 February 2026) is the current stable release and brings performance improvements
@@ -34,4 +35,3 @@ iterators) that simplify and harden the codebase.
   - `openspec/project.md` (Go version reference)
 - No breaking changes to public APIs or database schema
 - All existing tests must continue to pass after the upgrade
-

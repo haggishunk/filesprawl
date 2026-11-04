@@ -3,6 +3,7 @@
 ## ✅ Completed Steps
 
 ### Step 1: Event Handler Framework ✅
+
 - **File**: `internal/consolidation/ui/event_handler.go`
 - **Features**:
   - `KeyEventHandler` function type for keyboard input
@@ -11,6 +12,7 @@
   - Ready for gotui keyboard event integration
 
 ### Step 2: Status Widget ✅
+
 - **File**: `internal/consolidation/ui/widgets/status_widget.go`
 - **Features**:
   - StatusWidget wrapping gotui Paragraph
@@ -19,6 +21,7 @@
   - Methods: `GetWidget()`, `SetRect()`, `GetRect()`, `Clear()`
 
 ### Step 3: BrowsingScreen Layout Integration ✅
+
 - **File**: `internal/consolidation/ui/screens/browsing.go`
 - **Features**:
   - Implements 3-pane TUI layout (40% list, 60% details, 3-line status)
@@ -27,6 +30,7 @@
   - Displays layout information for visual verification
 
 ### Step 4: Keyboard Event Handler Registration ✅
+
 - **Method**: `BrowsingScreen.CreateKeyBindings()`
 - **Features**:
   - Register all 8 keybindings (j/k/v/a/d/s/q/K)

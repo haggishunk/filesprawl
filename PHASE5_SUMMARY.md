@@ -7,26 +7,31 @@ All infrastructure for gotui TUI integration is now in place. The consolidation 
 ## ✅ What Was Delivered
 
 ### 1. Event Handler Framework (`event_handler.go`)
+
 - `KeyEventHandler` function type for keyboard callbacks
 - `KeyBindingRegistry` for key→handler mapping
 - Full registration and query API
 
-### 2. Status Widget (`status_widget.go`)  
+### 2. Status Widget (`status_widget.go`)
+
 - Real gotui Paragraph widget wrapper
 - Displays real-time flag counts (Keep/Archive/Delete)
 - SetRect() integration for layout positioning
 
 ### 3. BrowsingScreen Layout Integration (`browsing.go`)
+
 - 3-pane layout calculation (40% list, 60% details, 3-line status)
 - All widgets configured with correct rectangles
 - Terminal size validation (minimum 80x24)
 
 ### 4. Keyboard Binding Registration
+
 - CreateKeyBindings() method registers all 8 keys
 - Display help text during initialization
 - Handlers ready for event loop integration
 
 ### 5. Layout Manager Refactoring (`widgets/layout_manager.go`)
+
 - Moved from ui package to widgets to avoid circular imports
 - Clean architecture with no import cycles
 
@@ -44,6 +49,7 @@ BrowsingScreen
 ## 🔧 What's Ready to Use
 
 All the following components work and are tested:
+
 - ✅ Layout calculation (tested with 80x24 terminal)
 - ✅ Widget positioning (all 4 panes configured)
 - ✅ Status updates (real flag counts)
@@ -89,6 +95,7 @@ To complete Phase 5, wire the gotui app in `BrowsingScreen.Show()`:
 ## 🎯 Status
 
 **Phase 5 Foundation: COMPLETE ✅**
+
 - Event framework: Ready
 - Layout system: Ready
 - Widget integration: Ready

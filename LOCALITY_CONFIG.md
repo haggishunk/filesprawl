@@ -7,6 +7,7 @@ The filesprawl locality interface uses a JSON configuration file to map between 
 The system searches for configuration in this priority order:
 
 1. **`FILESPRAWL_LOCALITY_CONFIG` environment variable** (if set)
+
    ```bash
    export FILESPRAWL_LOCALITY_CONFIG=/etc/filesprawl/locality.json
    filesprawl locality resolve-remote /documents/file.pdf
@@ -15,6 +16,7 @@ The system searches for configuration in this priority order:
 2. **XDG Base Directory Specification**
    - `$XDG_CONFIG_HOME/filesprawl/locality.json` (if `XDG_CONFIG_HOME` is set)
    - `$HOME/.config/filesprawl/locality.json` (standard XDG default)
+
    ```bash
    # Automatic: ~/.config/filesprawl/locality.json
    filesprawl locality resolve-remote /documents/file.pdf
@@ -78,6 +80,7 @@ filesprawl locality resolve-remote /documents/report.pdf
 ## Rule Priority
 
 Rules are evaluated in priority order (highest first):
+
 - Higher numbers = higher priority
 - More specific patterns should have higher priority
 - Wildcard patterns typically have lower priority (catch-all)
@@ -85,24 +88,30 @@ Rules are evaluated in priority order (highest first):
 ## Pattern Syntax
 
 **Wildcards:** `*` matches the rest of the path
+
 - `remotePattern: "/data/*"` matches `/data/file1.txt`, `/data/subdir/file2.txt`, etc.
 - `localPattern: "/home/user/data/*"` maps matched files to corresponding local paths
 
 **Variables:** `{variable}` captures path segments
+
 - `remotePattern: "/{category}/files"` captures `documents` in `/documents/files`
 - `localPattern: "/home/user/{category}"` expands to `/home/user/documents`
 
 ## Environment Variables
 
 ### FILESPRAWL_LOCALITY_CONFIG
+
 Override the default configuration file location:
+
 ```bash
 export FILESPRAWL_LOCALITY_CONFIG=/custom/path/locality.json
 filesprawl locality resolve-remote /documents/file.pdf
 ```
 
 ### XDG_CONFIG_HOME
+
 Set custom XDG config directory:
+
 ```bash
 export XDG_CONFIG_HOME=/etc/xdg
 # Looks for: /etc/xdg/filesprawl/locality.json
@@ -111,6 +120,7 @@ export XDG_CONFIG_HOME=/etc/xdg
 ## File Permissions
 
 For security, restrict access to the configuration file:
+
 ```bash
 chmod 600 ~/.config/filesprawl/locality.json
 ```
@@ -118,6 +128,7 @@ chmod 600 ~/.config/filesprawl/locality.json
 ## Troubleshooting
 
 ### Configuration file not found
+
 ```bash
 filesprawl locality show-config
 # Shows current configuration path and rules
@@ -125,12 +136,15 @@ filesprawl locality show-config
 ```
 
 ### Path not mapping
+
 - Check rule priority (higher number = checked first)
 - Verify pattern syntax (wildcards and variables)
 - Use `show-config` to inspect loaded rules
 
 ### Invalid JSON
+
 Error message will indicate parsing failure. Validate JSON:
+
 ```bash
 python3 -m json.tool ~/.config/filesprawl/locality.json
 ```

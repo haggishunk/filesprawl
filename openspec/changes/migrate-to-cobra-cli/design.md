@@ -1,11 +1,13 @@
 # Design: Migrate to Cobra CLI Framework
 
 ## Overview
+
 This change replaces the manual flag parsing and command dispatch in `main.go` with the Cobra CLI framework, providing professional help generation, better error messages, and modern CLI patterns.
 
 ## Current vs Proposed Structure
 
 ### Current (Manual)
+
 ```
 main.go
 ├── main()
@@ -19,6 +21,7 @@ main.go
 ```
 
 ### Proposed (Cobra)
+
 ```
 main.go
 └── main() - execute root command
@@ -37,6 +40,7 @@ internal/
 ## Command Structure
 
 ### Root Command
+
 ```bash
 filesprawl [command]
 
@@ -54,6 +58,7 @@ Flags:
 ```
 
 ### List Remotes Command
+
 ```go
 // cmd/list_remotes.go
 var listRemotesCmd = &cobra.Command{
@@ -69,6 +74,7 @@ rcd session running on http://localhost:5572.`,
 ```
 
 ### Index Command
+
 ```go
 // cmd/index.go
 var indexCmd = &cobra.Command{
@@ -86,7 +92,7 @@ persisting metadata to the database.`,
         // Get flag values from cmd
         remote, _ := cmd.Flags().GetString("remote")
         path, _ := cmd.Flags().GetString("path")
-        
+
         // Call existing business logic
         return runIndex(cmd.Context(), indexArgs{
             Remote: remote,
@@ -103,6 +109,7 @@ func init() {
 ```
 
 ### Duplicates Command
+
 ```go
 // cmd/duplicates.go
 var duplicatesCmd = &cobra.Command{
@@ -130,7 +137,7 @@ remote or across all indexed remotes.`,
         minSize, _ := cmd.Flags().GetInt64("min-size")
         limit, _ := cmd.Flags().GetInt("limit")
         offset, _ := cmd.Flags().GetInt("offset")
-        
+
         return runDuplicates(cmd.Context(), duplicatesArgs{
             Remote:        remote,
             AcrossRemotes: acrossRemotes,
@@ -154,7 +161,7 @@ func init() {
 func validateDuplicatesArgs(cmd *cobra.Command, args []string) error {
     remote, _ := cmd.Flags().GetString("remote")
     acrossRemotes, _ := cmd.Flags().GetBool("across-remotes")
-    
+
     // Mutually exclusive validation
     if remote != "" && acrossRemotes {
         return errors.New("--remote and --across-remotes are mutually exclusive")
@@ -162,7 +169,7 @@ func validateDuplicatesArgs(cmd *cobra.Command, args []string) error {
     if remote == "" && !acrossRemotes {
         return errors.New("must specify either --remote or --across-remotes")
     }
-    
+
     // Hash type validation
     hashType, _ := cmd.Flags().GetString("hash-type")
     if hashType != "" {
@@ -171,7 +178,7 @@ func validateDuplicatesArgs(cmd *cobra.Command, args []string) error {
             return fmt.Errorf("invalid hash type %q, must be one of: md5, sha1, sha256, dropbox", hashType)
         }
     }
-    
+
     return nil
 }
 ```
@@ -179,6 +186,7 @@ func validateDuplicatesArgs(cmd *cobra.Command, args []string) error {
 ## Help Output Examples
 
 ### Root Help
+
 ```
 $ filesprawl --help
 
@@ -203,6 +211,7 @@ Use "filesprawl [command] --help" for more information about a command.
 ```
 
 ### Index Help
+
 ```
 $ filesprawl index --help
 
@@ -226,6 +235,7 @@ Flags:
 ```
 
 ### Duplicates Help
+
 ```
 $ filesprawl duplicates --help
 
@@ -261,12 +271,14 @@ Flags:
 ## Error Message Improvements
 
 ### Current
+
 ```
 $ filesprawl duplicates
 must specify either --remote or --across-remotes
 ```
 
 ### With Cobra
+
 ```
 $ filesprawl duplicates
 Error: must specify either --remote or --across-remotes
@@ -286,6 +298,7 @@ must specify either --remote or --across-remotes
 ```
 
 ### Unknown Command
+
 ```
 $ filesprawl dups
 Error: unknown command "dups" for "filesprawl"
@@ -299,6 +312,7 @@ Run 'filesprawl --help' for usage.
 ## Shell Completion
 
 ### Bash
+
 ```bash
 # Generate completion script
 filesprawl completion bash > /etc/bash_completion.d/filesprawl
@@ -308,18 +322,21 @@ filesprawl completion bash > ~/.local/share/bash-completion/completions/filespra
 ```
 
 ### Zsh
+
 ```zsh
 # Generate and load
 filesprawl completion zsh > "${fpath[1]}/_filesprawl"
 ```
 
 ### Fish
+
 ```fish
 # Generate and load
 filesprawl completion fish > ~/.config/fish/completions/filesprawl.fish
 ```
 
 With completion installed, users get:
+
 - Command name completion
 - Flag name completion
 - Flag value suggestions (where applicable)
@@ -327,12 +344,14 @@ With completion installed, users get:
 ## Migration Strategy
 
 ### Phase 1: Add Cobra Structure (No Breaking Changes)
+
 1. Add Cobra dependency
 2. Create cmd/ directory with command files
 3. Keep existing functions working
 4. Main.go calls Cobra, Cobra calls existing functions
 
 ### Phase 2: Enhance (Optional Future Work)
+
 - Add command aliases (e.g., `dups` for `duplicates`)
 - Add persistent flags (e.g., `--database-url` on root)
 - Add interactive prompts for missing required flags
@@ -341,6 +360,7 @@ With completion installed, users get:
 ## Benefits Summary
 
 ### For Users
+
 - **Better Discovery**: `--help` on any command shows usage
 - **Faster Learning**: Examples in help output
 - **Less Frustration**: Clear error messages with suggestions
@@ -348,6 +368,7 @@ With completion installed, users get:
 - **Consistency**: Familiar patterns from kubectl, docker, gh, etc.
 
 ### For Developers
+
 - **Less Code**: Cobra handles parsing, validation, help generation
 - **Easier Maintenance**: Each command in its own file
 - **Better Testing**: Cobra provides testing utilities
@@ -361,4 +382,3 @@ With completion installed, users get:
 - Use Cobra's built-in flag validation where possible
 - Maintain backward compatibility - all existing command syntax continues to work
 - Tests should pass without modification (business logic unchanged)
-

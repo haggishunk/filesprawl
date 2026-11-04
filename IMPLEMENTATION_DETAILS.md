@@ -67,12 +67,12 @@ func (w *DetailsWidget) ShowGroup(group *DuplicateGroup) error {
 func (w *HashCentricWidget) renderHashCentricList() {
     for idx, group := range w.duplicates {
         indicator := w.analyzer.AnalyzeDuplicateGroup(group)
-        
+
         flagStr := ""
         if group.Flag != nil {
             flagStr = fmt.Sprintf(" [%s]", group.Flag.FlagType)
         }
-        
+
         // Format: "🔴 abc12345... (5 copies) [KEEP]"
         row := fmt.Sprintf("%s %s... (%d copies)%s",
             indicator,
@@ -92,7 +92,7 @@ func (w *HashCentricWidget) renderHashCentricList() {
 func (w *FilenameCentricWidget) renderFilenameCentricList() {
     for idx, group := range w.duplicates {
         indicator := w.analyzer.AnalyzeDuplicateGroup(group)
-        
+
         // Format: "🟢 document.pdf (3 versions) [ARCHIVE]"
         row := fmt.Sprintf("%s %s (%d %s)%s",
             indicator,
