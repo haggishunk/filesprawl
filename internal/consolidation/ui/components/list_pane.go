@@ -13,7 +13,8 @@ type ListPane struct {
 	selectedIndex int
 	width         int
 	height        int
-	scrollOffset  int // For scrolling when list is longer than height
+	scrollOffset  int  // For scrolling when list is longer than height
+	focused       bool // Whether this pane has input focus
 }
 
 // NewListPane creates a new ListPane component
@@ -69,6 +70,11 @@ func (lp *ListPane) GetSelectedGroup() *browsing.DuplicateGroup {
 	return nil
 }
 
+// SetFocus sets whether this pane has input focus
+func (lp *ListPane) SetFocus(focused bool) {
+	lp.focused = focused
+}
+
 // Render returns the rendered view of the list pane
 func (lp *ListPane) Render() string {
 	var buf strings.Builder
@@ -79,8 +85,13 @@ func (lp *ListPane) Render() string {
 		contentHeight = 1
 	}
 
-	// Render header
-	buf.WriteString("┌─ HASH LIST ─────────────────────┐\n")
+	// Render header with focus indicator
+	headerChar := "─"
+	if lp.focused {
+		headerChar = "═"
+	}
+	header := fmt.Sprintf("┌%s HASH LIST %s┐\n", strings.Repeat(headerChar, 1), strings.Repeat(headerChar, 20))
+	buf.WriteString(header)
 
 	// Calculate which groups to show
 	endIdx := lp.scrollOffset + contentHeight
