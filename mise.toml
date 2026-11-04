@@ -5,8 +5,10 @@
 actionlint = "latest"
 hk = "latest"
 golangci-lint = "latest"
+pkl = "latest"
 shellcheck = "latest"
 shellharden = "latest"
+shfmt = "latest"
 zizmor = "latest"
 
 [tasks.pre-commit]
