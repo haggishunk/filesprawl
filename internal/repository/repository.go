@@ -21,6 +21,12 @@ type HashGroup struct {
 	Count     int
 }
 
+// FilenameGroup represents a filename that appears in more than one location/with variations.
+type FilenameGroup struct {
+	Filename string
+	Count    int
+}
+
 // FileRecord holds per-file metadata returned by GetFilesByHash.
 type FileRecord struct {
 	ID           int
@@ -667,4 +673,161 @@ func (r *ObjectRepository) GetFilesByHashes(ctx context.Context, hashes []HashTy
 	}
 
 	return result, nil
+}
+
+// FindDuplicateFilenamesAcrossRemotes returns filenames that appear in more than one location.
+// Optionally filter by minSize (0 means no size filter).
+// Use limit=0 and offset=0 for no pagination.
+func (r *ObjectRepository) FindDuplicateFilenamesAcrossRemotes(ctx context.Context, minSize int64, limit, offset int) ([]FilenameGroup, error) {
+	var args []interface{}
+	where := ""
+	if minSize > 0 {
+		args = append(args, minSize)
+		where = fmt.Sprintf("WHERE om.object_size >= $%d", len(args))
+	}
+
+	limitClause := ""
+	if limit > 0 {
+		args = append(args, limit)
+		args = append(args, offset)
+		limitClause = fmt.Sprintf("LIMIT $%d OFFSET $%d", len(args)-1, len(args))
+	}
+
+	statement := fmt.Sprintf(`
+		SELECT om.object_name, COUNT(DISTINCT om.id) AS duplicate_count
+		FROM object_meta om
+		%s
+		GROUP BY om.object_name
+		HAVING COUNT(DISTINCT om.id) > 1
+		ORDER BY duplicate_count DESC
+		%s;
+	`, where, limitClause)
+
+	rows, err := r.db.Query(ctx, statement, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query duplicate filenames: %w", err)
+	}
+	defer rows.Close()
+
+	var groups []FilenameGroup
+	for rows.Next() {
+		var g FilenameGroup
+		if err := rows.Scan(&g.Filename, &g.Count); err != nil {
+			return nil, fmt.Errorf("failed to scan filename group: %w", err)
+		}
+		groups = append(groups, g)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating filename groups: %w", err)
+	}
+
+	return groups, nil
+}
+
+// FindDuplicateFilenamesWithinRemote returns filenames that appear more than once within a specific location.
+// Optionally filter by minSize (0 means no size filter).
+// Use limit=0 and offset=0 for no pagination.
+func (r *ObjectRepository) FindDuplicateFilenamesWithinRemote(ctx context.Context, locationName string, minSize int64, limit, offset int) ([]FilenameGroup, error) {
+	// Look up the location by name to get its ID
+	var locationId int
+	statement := `SELECT id FROM location WHERE name = $1 LIMIT 1`
+	row := r.db.QueryRow(ctx, statement, locationName)
+	err := row.Scan(&locationId)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			// No location found with this name
+			return []FilenameGroup{}, nil
+		}
+		return nil, fmt.Errorf("failed to find location %q: %w", locationName, err)
+	}
+
+	var args []interface{}
+	args = append(args, locationId)
+	where := fmt.Sprintf("WHERE om.location_id = $%d", len(args))
+	if minSize > 0 {
+		args = append(args, minSize)
+		where += fmt.Sprintf(" AND om.object_size >= $%d", len(args))
+	}
+
+	limitClause := ""
+	if limit > 0 {
+		args = append(args, limit)
+		args = append(args, offset)
+		limitClause = fmt.Sprintf("LIMIT $%d OFFSET $%d", len(args)-1, len(args))
+	}
+
+	statement = fmt.Sprintf(`
+		SELECT om.object_name, COUNT(DISTINCT om.id) AS duplicate_count
+		FROM object_meta om
+		%s
+		GROUP BY om.object_name
+		HAVING COUNT(DISTINCT om.id) > 1
+		ORDER BY duplicate_count DESC
+		%s;
+	`, where, limitClause)
+
+	rows, err := r.db.Query(ctx, statement, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query duplicate filenames within location: %w", err)
+	}
+	defer rows.Close()
+
+	var groups []FilenameGroup
+	for rows.Next() {
+		var g FilenameGroup
+		if err := rows.Scan(&g.Filename, &g.Count); err != nil {
+			return nil, fmt.Errorf("failed to scan filename group: %w", err)
+		}
+		groups = append(groups, g)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating filename groups: %w", err)
+	}
+
+	return groups, nil
+}
+
+// GetFilesByFilename returns all files with the given name (across all locations).
+// Optionally filter by minSize (0 means no size filter).
+func (r *ObjectRepository) GetFilesByFilename(ctx context.Context, filename string, minSize int64) ([]FileRecord, error) {
+	var args []interface{}
+	args = append(args, filename)
+	where := fmt.Sprintf("WHERE om.object_name = $%d", len(args))
+	if minSize > 0 {
+		args = append(args, minSize)
+		where += fmt.Sprintf(" AND om.object_size >= $%d", len(args))
+	}
+
+	statement := fmt.Sprintf(`
+		SELECT om.id, om.object_name, om.object_path, om.object_mime_type, om.object_size,
+		       om.location_id, om.absolute_path, l.name, l.type
+		FROM object_meta om
+		JOIN location l ON om.location_id = l.id
+		%s
+		ORDER BY om.absolute_path;
+	`, where)
+
+	rows, err := r.db.Query(ctx, statement, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query files by filename: %w", err)
+	}
+	defer rows.Close()
+
+	var records []FileRecord
+	for rows.Next() {
+		var f FileRecord
+		if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size,
+			&f.LocationId, &f.AbsolutePath, &f.LocationName, &f.LocationType); err != nil {
+			return nil, fmt.Errorf("failed to scan file record: %w", err)
+		}
+		records = append(records, f)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating file records: %w", err)
+	}
+
+	return records, nil
 }
