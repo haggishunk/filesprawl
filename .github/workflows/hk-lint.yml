@@ -1,0 +1,48 @@
+name: hk lint
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+
+jobs:
+  hk-check:
+    name: Run hk pre-commit checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Install hk
+        run: |
+          curl -fsSL https://get.jetify.com/hk | bash
+
+      - name: Run hk pre-commit checks on changed files
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          # Get the list of changed files between base and head
+          git fetch origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
+
+          # Run hk on files changed in this PR
+          hk run pre-commit --from-ref "origin/$BASE_REF" --to-ref HEAD --check
+
+      - name: Comment on PR if checks fail
+        if: failure()
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          body: "❌ hk pre-commit checks failed. Please run `hk run pre-commit --fix --all` locally and push the changes."
