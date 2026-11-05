@@ -71,7 +71,7 @@ func WithScanRoot(root string) ScannerOpt {
 // Scan handles scanning of a remote
 func Scan(ctx context.Context, s *Scanner, lc rclone.ListConfig) error {
 	// On first call, ensure location exists for this remote
-	if s.Remote.Location.Id == 0 {
+	if !s.Remote.Location.Persisted || s.Remote.Location.Id <= 0 {
 		if err := s.Repo.EnsureLocation(ctx, &s.Remote.Location); err != nil {
 			return fmt.Errorf("failed to ensure location: %w", err)
 		}
@@ -108,7 +108,7 @@ func Scan(ctx context.Context, s *Scanner, lc rclone.ListConfig) error {
 			meta := object.NewMeta(lri.Name, lri.Path, lri.MimeType,
 				object.WithMetaSize(lri.Size),
 				object.WithMetaScanRoot(s.ScanRoot),
-				object.WithMetaLocationId(s.Remote.LocationId),
+				object.WithMetaLocationId(s.Remote.Location.Id),
 				object.WithMetaAbsolutePath(absolutePath))
 
 			// Persist meta and hashes
