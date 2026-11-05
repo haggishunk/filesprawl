@@ -58,7 +58,7 @@ func runIndexCmd(cmd *cobra.Command, _ []string) error {
 	)
 
 	lo := rclone.NewListOption(rclone.ListOptionFilesOnly())
-	lc := rclone.NewListConfig(toRcloneFS(rem.Name), indexPath, &lo)
+	lc := rclone.NewListConfig(toRcloneFS(rem.Location.Name), indexPath, &lo)
 	if err := operation.Scan(ctx, &scn, lc); err != nil {
 		return err
 	}
