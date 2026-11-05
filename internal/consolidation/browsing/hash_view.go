@@ -27,11 +27,10 @@ func (r *HashViewRenderer) Render(session *BrowsingSession, pageSize int) string
 
 	// Show summary
 	flagCounts := countFlags(session.Flags)
-	output.WriteString(fmt.Sprintf("Total duplicate groups: %d | Flagged: %d | ",
+	fmt.Fprintf(&output, "Total duplicate groups: %d | Flagged: %d | ",
 		len(session.DuplicateGroups),
-		len(session.Flags),
-	))
-	output.WriteString(fmt.Sprintf("Actions: [k]eep [a]rchive [d]elete [TAB]view [Q]uit\n\n"))
+		len(session.Flags))
+	output.WriteString("Actions: [k]eep [a]rchive [d]elete [TAB]view [Q]uit\n\n")
 
 	// Render each duplicate group
 	for i, group := range session.DuplicateGroups {
@@ -43,7 +42,7 @@ func (r *HashViewRenderer) Render(session *BrowsingSession, pageSize int) string
 	output.WriteString("Summary: ")
 	for flagType, count := range flagCounts {
 		if count > 0 {
-			output.WriteString(fmt.Sprintf("%s=%d ", flagType, count))
+			fmt.Fprintf(&output, "%s=%d ", flagType, count)
 		}
 	}
 	output.WriteString("\n\n")
@@ -64,13 +63,12 @@ func (r *HashViewRenderer) renderGroup(output *strings.Builder, group DuplicateG
 		status = fmt.Sprintf(" [%s]", group.Flag.FlagType)
 	}
 
-	output.WriteString(fmt.Sprintf("%sHash: %s (%d copies)%s %s\n",
+	fmt.Fprintf(output, "%sHash: %s (%d copies)%s %s\n",
 		prefix,
 		truncateHash(group.Identifier, 8),
 		group.Count,
 		status,
-		indicator,
-	))
+		indicator)
 
 	// Render expanded details if needed
 	if expanded[group.Identifier] {
@@ -93,12 +91,11 @@ func (r *HashViewRenderer) renderGroupDetails(output *strings.Builder, group Dup
 	// Render each location
 	for locName, files := range locationMap {
 		indicator := getLocationIndicator(len(files), len(group.Versions))
-		output.WriteString(fmt.Sprintf("    %s %s (%s) — %d copy/copies\n",
+		fmt.Fprintf(output, "    %s %s (%s) — %d copy/copies\n",
 			indicator,
 			locName,
 			"local", // TODO: Get actual type from location
-			len(files),
-		))
+			len(files))
 
 		// Show files in this location
 		for _, fv := range files {
@@ -106,11 +103,10 @@ func (r *HashViewRenderer) renderGroupDetails(output *strings.Builder, group Dup
 			if fv.Flag != nil {
 				flagStr = fmt.Sprintf(" [%s]", fv.Flag.FlagType)
 			}
-			output.WriteString(fmt.Sprintf("      • %s @ %s%s\n",
+			fmt.Fprintf(output, "      • %s @ %s%s\n",
 				fv.FileInfo.Name,
 				truncatePath(fv.FileInfo.Path, 40),
-				flagStr,
-			))
+				flagStr)
 		}
 	}
 

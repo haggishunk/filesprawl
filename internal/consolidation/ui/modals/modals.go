@@ -14,7 +14,7 @@ type ModalResult struct {
 type Modal interface {
 	// Execute runs the modal and returns result
 	Execute() ModalResult
-	
+
 	// Cancel closes the modal without action
 	Cancel()
 }
@@ -37,7 +37,7 @@ func NewKeepModal() *KeepModal {
 func (km *KeepModal) Execute() ModalResult {
 	fmt.Printf("\n%s\n%s\n[Confirm]/[Cancel]: ", km.title, km.message)
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 	return ModalResult{Confirmed: response == "y" || response == "yes"}
 }
 
@@ -48,9 +48,8 @@ func (km *KeepModal) Cancel() {
 
 // ArchiveModal gets archive destination
 type ArchiveModal struct {
-	title       string
-	message     string
-	destination string
+	title   string
+	message string
 }
 
 // NewArchiveModal creates an archive destination modal
@@ -65,7 +64,7 @@ func NewArchiveModal() *ArchiveModal {
 func (am *ArchiveModal) Execute() ModalResult {
 	fmt.Printf("\n%s\n%s\n", am.title, am.message)
 	var dest string
-	fmt.Scanln(&dest)
+	_, _ = fmt.Scanln(&dest)
 	if dest == "" {
 		return ModalResult{Confirmed: false, Error: fmt.Errorf("destination required")}
 	}
@@ -79,9 +78,9 @@ func (am *ArchiveModal) Cancel() {
 
 // DeleteModal confirms file deletion
 type DeleteModal struct {
-	title       string
-	isCritical  bool
-	message     string
+	title      string
+	isCritical bool
+	message    string
 }
 
 // NewDeleteModal creates a delete confirmation modal
@@ -101,7 +100,7 @@ func NewDeleteModal(isCritical bool) *DeleteModal {
 func (dm *DeleteModal) Execute() ModalResult {
 	fmt.Printf("\n%s\n%s\n[Confirm]/[Cancel]: ", dm.title, dm.message)
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 	return ModalResult{Confirmed: response == "y" || response == "yes"}
 }
 
@@ -128,7 +127,7 @@ func NewSkipModal() *SkipModal {
 func (sm *SkipModal) Execute() ModalResult {
 	fmt.Printf("\n%s\n%s\n[Confirm]/[Cancel]: ", sm.title, sm.message)
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 	return ModalResult{Confirmed: response == "y" || response == "yes"}
 }
 

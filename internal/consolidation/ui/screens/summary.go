@@ -10,14 +10,14 @@ import (
 
 // SummaryScreen displays flagging decisions and allows final confirmation
 type SummaryScreen struct {
-	sessionManager *browsing.SessionManager
+	sessionManager  *browsing.SessionManager
 	summaryRenderer *browsing.SummaryRenderer
 }
 
 // NewSummaryScreen creates a new summary screen
 func NewSummaryScreen(sessionMgr *browsing.SessionManager) *SummaryScreen {
 	return &SummaryScreen{
-		sessionManager: sessionMgr,
+		sessionManager:  sessionMgr,
 		summaryRenderer: browsing.NewSummaryRenderer(),
 	}
 }

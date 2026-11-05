@@ -1,7 +1,9 @@
 # Change: Migrate to Cobra CLI Framework
 
 ## Why
+
 The current CLI implementation uses manual flag parsing with the standard library `flag` package, which results in:
+
 - No built-in help generation (`--help` must be manually implemented)
 - No subcommand structure (everything is in a flat switch statement)
 - Manual validation and error messages for each command
@@ -10,6 +12,7 @@ The current CLI implementation uses manual flag parsing with the standard librar
 - Poor user experience compared to modern CLI tools
 
 Migrating to Cobra (https://github.com/spf13/cobra) would provide:
+
 - Automatic help generation with consistent formatting
 - Nested subcommand support with proper structure
 - Built-in flag inheritance (persistent flags)
@@ -19,6 +22,7 @@ Migrating to Cobra (https://github.com/spf13/cobra) would provide:
 - Better maintainability and extensibility
 
 ## What Changes
+
 - Add `github.com/spf13/cobra` dependency to go.mod
 - Restructure main.go to use Cobra's command pattern
 - Create root command with version, help, and completion support
@@ -28,6 +32,7 @@ Migrating to Cobra (https://github.com/spf13/cobra) would provide:
 - Maintain backward compatibility with existing command syntax
 
 ## Impact
+
 - Affected specs:
   - Modified capability `duplicates-cli` (improved help and validation)
   - New capability `cobra-cli` (framework integration)
@@ -46,4 +51,3 @@ Migrating to Cobra (https://github.com/spf13/cobra) would provide:
   - Less boilerplate code
   - Better testing support
   - Standard patterns for CLI applications
-

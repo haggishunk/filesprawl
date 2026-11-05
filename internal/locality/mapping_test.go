@@ -148,31 +148,31 @@ func TestGetDefaultConfigPath(t *testing.T) {
 	origHome := os.Getenv("HOME")
 	defer func() {
 		if origEnv != "" {
-			os.Setenv("FILESPRAWL_LOCALITY_CONFIG", origEnv)
+			_ = os.Setenv("FILESPRAWL_LOCALITY_CONFIG", origEnv)
 		} else {
-			os.Unsetenv("FILESPRAWL_LOCALITY_CONFIG")
+			_ = os.Unsetenv("FILESPRAWL_LOCALITY_CONFIG")
 		}
 		if origXDG != "" {
-			os.Setenv("XDG_CONFIG_HOME", origXDG)
+			_ = os.Setenv("XDG_CONFIG_HOME", origXDG)
 		} else {
-			os.Unsetenv("XDG_CONFIG_HOME")
+			_ = os.Unsetenv("XDG_CONFIG_HOME")
 		}
 		if origHome != "" {
-			os.Setenv("HOME", origHome)
+			_ = os.Setenv("HOME", origHome)
 		}
 	}()
 
 	// Test 1: Explicit FILESPRAWL_LOCALITY_CONFIG env var takes priority
 	testPath := "/custom/path/locality.json"
-	os.Setenv("FILESPRAWL_LOCALITY_CONFIG", testPath)
-	os.Unsetenv("XDG_CONFIG_HOME")
+	_ = os.Setenv("FILESPRAWL_LOCALITY_CONFIG", testPath)
+	_ = os.Unsetenv("XDG_CONFIG_HOME")
 	if path := GetDefaultConfigPath(); path != testPath {
 		t.Fatalf("expected custom path %s, got %s", testPath, path)
 	}
 
 	// Test 2: XDG_CONFIG_HOME is checked (but file may not exist)
-	os.Unsetenv("FILESPRAWL_LOCALITY_CONFIG")
-	os.Setenv("XDG_CONFIG_HOME", "/tmp")
+	_ = os.Unsetenv("FILESPRAWL_LOCALITY_CONFIG")
+	_ = os.Setenv("XDG_CONFIG_HOME", "/tmp")
 	path := GetDefaultConfigPath()
 	// Should include filesprawl/locality.json
 	if path == "" {
@@ -180,9 +180,9 @@ func TestGetDefaultConfigPath(t *testing.T) {
 	}
 
 	// Test 3: Fall back to $HOME/.config/filesprawl/locality.json
-	os.Unsetenv("FILESPRAWL_LOCALITY_CONFIG")
-	os.Unsetenv("XDG_CONFIG_HOME")
-	os.Setenv("HOME", "/home/testuser")
+	_ = os.Unsetenv("FILESPRAWL_LOCALITY_CONFIG")
+	_ = os.Unsetenv("XDG_CONFIG_HOME")
+	_ = os.Setenv("HOME", "/home/testuser")
 	path = GetDefaultConfigPath()
 	if path == "" {
 		t.Fatalf("expected default path, got empty string")

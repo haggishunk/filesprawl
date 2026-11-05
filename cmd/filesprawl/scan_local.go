@@ -8,8 +8,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var scanLocalPath string
-
 var scanLocalCmd = &cobra.Command{
 	Use:   "scan-local",
 	Short: "Index files from a local filesystem path",

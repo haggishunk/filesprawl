@@ -46,9 +46,9 @@ func seedDuplicates(t *testing.T, repo *ObjectRepository) func() {
 
 	return func() {
 		ctx := context.Background()
-		repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE id = $1 OR id = $2`, j1, j2)
-		repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id = $1 OR id = $2`, meta1, meta2)
-		repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE id = $1 OR id = $2`, j1, j2)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id = $1 OR id = $2`, meta1, meta2)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
 	}
 }
 
@@ -148,9 +148,9 @@ func TestIntegration_GetFilesByHash(t *testing.T) {
 	j1 := writeJunctionRaw(t, ctx, repo, meta1, hash)
 	j2 := writeJunctionRaw(t, ctx, repo, meta2, hash)
 	defer func() {
-		repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE id = $1 OR id = $2`, j1, j2)
-		repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id = $1 OR id = $2`, meta1, meta2)
-		repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE id = $1 OR id = $2`, j1, j2)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id = $1 OR id = $2`, meta1, meta2)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
 	}()
 
 	records, err := repo.GetFilesByHash(ctx, hashVal, "md5", 0)
@@ -174,9 +174,9 @@ func TestIntegration_GetFilesByHash_MinSizeFilter(t *testing.T) {
 	meta := writeMetaRaw(t, ctx, repo, "small.txt", "/integ/small.txt", "text/plain")
 	j := writeJunctionRaw(t, ctx, repo, meta, hash)
 	defer func() {
-		repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE id = $1`, j)
-		repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id = $1`, meta)
-		repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE id = $1`, j)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id = $1`, meta)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
 	}()
 
 	// minSize larger than 512 should exclude the record
@@ -214,11 +214,11 @@ func TestIntegration_PersistResult_PersistsRemoteAssociations(t *testing.T) {
 	}
 
 	defer func() {
-		repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE remote_id = $1`, rem.Id)
-		repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_meta_id IN (SELECT id FROM object_meta WHERE object_path = $1 OR object_path = $2)`, item1.Path, item2.Path)
-		repo.db.Exec(ctx, `DELETE FROM object_meta WHERE object_path = $1 OR object_path = $2`, item1.Path, item2.Path)
-		repo.db.Exec(ctx, `DELETE FROM object_hash WHERE hash_value = $1 OR hash_value = $2`, item1.Hashes["md5"], item2.Hashes["md5"])
-		repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, rem.Id)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE remote_id = $1`, rem.Id)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_meta_id IN (SELECT id FROM object_meta WHERE object_path = $1 OR object_path = $2)`, item1.Path, item2.Path)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE object_path = $1 OR object_path = $2`, item1.Path, item2.Path)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE hash_value = $1 OR hash_value = $2`, item1.Hashes["md5"], item2.Hashes["md5"])
+		_, _ = repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, rem.Id)
 	}()
 
 	if err := repo.PersistResult(ctx, &rem, item1, "/integ/"+stamp); err != nil {
@@ -271,11 +271,11 @@ func TestIntegration_PersistLocalResult_ScanRootDeduplication(t *testing.T) {
 	mB := object.NewMeta("a.jpg", "a.jpg", "image/jpeg", object.WithMetaSize(512), object.WithMetaScanRoot(rootB))
 
 	defer func() {
-		repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_meta_id IN ($1, $2)`, mA.Id, mB.Id)
-		repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE object_meta_id IN ($1, $2)`, mA.Id, mB.Id)
-		repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2)`, mA.Id, mB.Id)
-		repo.db.Exec(ctx, `DELETE FROM object_hash WHERE hash_value = $1`, hashVal)
-		repo.db.Exec(ctx, `DELETE FROM remote WHERE id IN ($1, $2)`, remA.Id, remB.Id)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_meta_id IN ($1, $2)`, mA.Id, mB.Id)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE object_meta_id IN ($1, $2)`, mA.Id, mB.Id)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2)`, mA.Id, mB.Id)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE hash_value = $1`, hashVal)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM remote WHERE id IN ($1, $2)`, remA.Id, remB.Id)
 	}()
 
 	if err := repo.PersistLocalResult(ctx, &remA, &mA, hashes); err != nil {
@@ -341,9 +341,9 @@ func TestIntegration_PersistLocalResult_SymlinkMarked(t *testing.T) {
 		object.WithMetaSize(8), object.WithMetaSymlink(true), object.WithMetaScanRoot(root))
 
 	defer func() {
-		repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE object_meta_id = $1`, m.Id)
-		repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id = $1`, m.Id)
-		repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, rem.Id)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE object_meta_id = $1`, m.Id)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id = $1`, m.Id)
+		_, _ = repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, rem.Id)
 	}()
 
 	// Symlinks are persisted without hashes
@@ -437,10 +437,10 @@ func TestGetFilesByHashes(t *testing.T) {
 	}
 
 	// Cleanup
-	repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id IN ($1, $2, $3)`, hash1, hash2, hash3)
-	repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2, $3, $4, $5, $6)`,
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id IN ($1, $2, $3)`, hash1, hash2, hash3)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2, $3, $4, $5, $6)`,
 		meta1a, meta1b, meta2a, meta2b, meta3a, meta3b)
-	repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id IN ($1, $2, $3)`, hash1, hash2, hash3)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id IN ($1, $2, $3)`, hash1, hash2, hash3)
 }
 
 // TestGetFilesByHashes_WithMinSize tests batch query respects size filter.
@@ -474,9 +474,9 @@ func TestGetFilesByHashes_WithMinSize(t *testing.T) {
 	}
 
 	// Cleanup
-	repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id = $1`, hash)
-	repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2)`, meta1, meta2)
-	repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id = $1`, hash)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2)`, meta1, meta2)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
 }
 
 // TestGetFilesByHashes_Empty tests batch query with empty hash list.
@@ -557,11 +557,11 @@ func TestFindDuplicatesWithinRemote_WithHostnamePrefix(t *testing.T) {
 	}
 
 	// Cleanup
-	repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE remote_id = $1`, remID)
-	repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id = $1`, hash)
-	repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2)`, meta1, meta2)
-	repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
-	repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, remID)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE remote_id = $1`, remID)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id = $1`, hash)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2)`, meta1, meta2)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, remID)
 }
 
 // TestFindDuplicatesWithinRemote_HostnameInNameWithSlash tests edge case:
@@ -601,9 +601,9 @@ func TestFindDuplicatesWithinRemote_HostnamePrefixedPath(t *testing.T) {
 	}
 
 	// Cleanup
-	repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE remote_id = $1`, remID)
-	repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id = $1`, hash)
-	repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2)`, meta1, meta2)
-	repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
-	repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, remID)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_remote_junction WHERE remote_id = $1`, remID)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id = $1`, hash)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_meta WHERE id IN ($1, $2)`, meta1, meta2)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE id = $1`, hash)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM remote WHERE id = $1`, remID)
 }

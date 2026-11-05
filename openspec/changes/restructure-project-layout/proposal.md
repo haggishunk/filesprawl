@@ -1,9 +1,11 @@
 # Change: Restructure Project Layout
 
 ## Why
+
 The current project structure has all code in a single `main.go` file (168 lines) with business logic mixed into the CLI layer. This creates several issues:
 
 **Current Problems:**
+
 - Business logic is not reusable as a library
 - CLI code is tightly coupled to main.go
 - Cannot use filesprawl functionality from other Go programs
@@ -13,6 +15,7 @@ The current project structure has all code in a single `main.go` file (168 lines
 
 **Industry Standards:**
 Based on official Go documentation and community consensus (2024):
+
 - `cmd/` for multiple binaries or to separate CLI from library
 - `internal/` for private packages (compiler-enforced)
 - Library code at root for clean import paths (NOT in `pkg/`)
@@ -22,6 +25,7 @@ Based on official Go documentation and community consensus (2024):
 ## What Changes
 
 ### Proposed Structure
+
 ```
 filesprawl/
 ├── cmd/
@@ -81,6 +85,7 @@ filesprawl/
 ## Impact
 
 ### Benefits for Library Users
+
 ```go
 import "github.com/haggishunk/filesprawl"
 
@@ -90,17 +95,20 @@ duplicates, err := detector.FindAcrossRemotes(ctx, opts)
 ```
 
 ### Benefits for CLI Development
+
 - Each command in its own file
 - Easier to add new commands
 - Better testability
 - Clear separation of concerns
 
 ### Benefits for Testing
+
 - Test business logic independently of CLI
 - Test CLI separately from business logic
 - Integration tests can use library directly
 
 ### Affected Code
+
 - `main.go` → moves to `cmd/filesprawl/main.go`
 - Command functions → split into `cmd/filesprawl/*.go`
 - Database connection → moves to `internal/cli/config.go`
@@ -108,8 +116,8 @@ duplicates, err := detector.FindAcrossRemotes(ctx, opts)
 - New `filesprawl.go` → public API exports
 
 ### Migration Path
+
 1. Phase 1: Create structure (no breaking changes)
 2. Phase 2: Move code gradually
 3. Phase 3: Deprecate old main.go (keep as symlink)
 4. Phase 4: Document library API
-

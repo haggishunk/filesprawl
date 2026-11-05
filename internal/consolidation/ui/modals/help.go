@@ -4,7 +4,7 @@ import "fmt"
 
 // HelpContent returns formatted help text
 func HelpContent() string {
-	return fmt.Sprintf(`
+	return `
 ╔════════════════════════════════════════════════════════════════╗
 ║                    FILESPRAWL HELP                            ║
 ╚════════════════════════════════════════════════════════════════╝
@@ -89,7 +89,7 @@ To mark a group (after selecting with j/k):
   [s] → Skip for now (undo any flags)
 
 Press SPACE or ENTER to continue...
-`)
+`
 }
 
 // ShowHelpModal displays help and returns when closed

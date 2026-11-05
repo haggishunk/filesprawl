@@ -2,9 +2,9 @@ package browsing
 
 import (
 	"context"
+	"github.com/haggishunk/filesprawl/internal/consolidation/flags"
 	"testing"
 	"time"
-	"github.com/haggishunk/filesprawl/internal/consolidation/flags"
 )
 
 func TestSessionHandlerCreation(t *testing.T) {
@@ -78,7 +78,7 @@ func TestQuitWithoutConsolidation(t *testing.T) {
 	sh := NewSessionHandler(sm, pfm)
 
 	// Add some flags
-	pfm.GetOrCreateStateMachine(10).TransitionKeep()
+	_ = pfm.GetOrCreateStateMachine(10).TransitionKeep()
 	sm.flags[10] = &flags.Flag{FileID: 10, FlagType: flags.FlagTypeKeep}
 
 	ctx := context.Background()
@@ -116,7 +116,7 @@ func TestGetSessionSummary(t *testing.T) {
 	sh := NewSessionHandler(sm, pfm)
 
 	// Add test data
-	pfm.GetOrCreateStateMachine(1).TransitionKeep()
+	_ = pfm.GetOrCreateStateMachine(1).TransitionKeep()
 	sm.flags[1] = &flags.Flag{FileID: 1, FlagType: flags.FlagTypeKeep}
 
 	summary := sh.GetSessionSummary()

@@ -41,13 +41,13 @@ func TestSetAndGetRows(t *testing.T) {
 func TestSelectedIndex(t *testing.T) {
 	widget := NewBaseListWidget("Test")
 	rows := []string{"Row 1", "Row 2", "Row 3"}
-	widget.SetRows(rows)
+	_ = widget.SetRows(rows)
 
 	if widget.GetSelectedIndex() != 0 {
 		t.Errorf("expected initial index 0, got %d", widget.GetSelectedIndex())
 	}
 
-	widget.SetSelectedIndex(2)
+	_ = widget.SetSelectedIndex(2)
 	if widget.GetSelectedIndex() != 2 {
 		t.Errorf("expected index 2, got %d", widget.GetSelectedIndex())
 	}
@@ -60,7 +60,7 @@ func TestSelectedIndex(t *testing.T) {
 func TestScrolling(t *testing.T) {
 	widget := NewBaseListWidget("Test")
 	rows := []string{"Row 1", "Row 2", "Row 3"}
-	widget.SetRows(rows)
+	_ = widget.SetRows(rows)
 
 	// Test scroll down
 	widget.ScrollDown()
@@ -89,7 +89,7 @@ func TestScrolling(t *testing.T) {
 func TestClear(t *testing.T) {
 	widget := NewBaseListWidget("Test")
 	rows := []string{"Row 1", "Row 2"}
-	widget.SetRows(rows)
+	_ = widget.SetRows(rows)
 
 	if widget.Count() != 2 {
 		t.Errorf("expected 2 rows, got %d", widget.Count())

@@ -3,6 +3,7 @@ module github.com/haggishunk/filesprawl
 go 1.24.0
 
 require (
+	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/jackc/pgx/v5 v5.5.3
 	github.com/metaspartan/gotui/v5 v5.0.3
 	github.com/mitchellh/mapstructure v1.5.0
@@ -15,7 +16,6 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/charmbracelet/bubbletea v1.3.10 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
 	github.com/charmbracelet/lipgloss v1.1.0 // indirect
 	github.com/charmbracelet/x/ansi v0.10.1 // indirect

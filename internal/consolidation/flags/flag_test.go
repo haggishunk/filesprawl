@@ -109,4 +109,3 @@ func TestContextCancellation(t *testing.T) {
 	// Any operation with cancelled context should fail gracefully
 	// (actual test requires database connection)
 }
-

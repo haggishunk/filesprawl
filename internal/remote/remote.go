@@ -5,11 +5,11 @@ import (
 )
 
 type Remote struct {
-	Id        int
+	Id         int
 	LocationId int // FK to location table
-	Location  location.Location
-	Name      string // path or remote name within the location
-	Persisted bool
+	Location   location.Location
+	Name       string // path or remote name within the location
+	Persisted  bool
 }
 
 type RemoteOption func(*Remote)
@@ -31,11 +31,11 @@ func WithLocation(loc location.Location) RemoteOption {
 // name: path/subdirectory for local scans or remote name for rclone
 func NewRemote(loc location.Location, name string, options ...RemoteOption) Remote {
 	r := Remote{
-		Id:        -1,
+		Id:         -1,
 		LocationId: loc.Id,
-		Location:  loc,
-		Name:      name,
-		Persisted: false,
+		Location:   loc,
+		Name:       name,
+		Persisted:  false,
 	}
 
 	for _, opt := range options {

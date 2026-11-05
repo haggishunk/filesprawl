@@ -4,13 +4,13 @@
 
 ### ✅ Completed Phases
 
-| Phase | Component | Status | Tests |
-|-------|-----------|--------|-------|
-| 1 | Data Bridge (Adapter) | ✅ Complete | ✅ Pass |
-| 2 | Real Widgets (gotui) | ✅ Complete | ✅ Pass |
-| 3 | Screen Infrastructure | ✅ Complete | ✅ Pass |
-| 4 | Modals + Layout + Summary | ✅ Complete | ✅ Pass |
-| 5 | gotui TUI Foundation | ✅ Complete | ✅ Pass |
+| Phase | Component                 | Status      | Tests   |
+| ----- | ------------------------- | ----------- | ------- |
+| 1     | Data Bridge (Adapter)     | ✅ Complete | ✅ Pass |
+| 2     | Real Widgets (gotui)      | ✅ Complete | ✅ Pass |
+| 3     | Screen Infrastructure     | ✅ Complete | ✅ Pass |
+| 4     | Modals + Layout + Summary | ✅ Complete | ✅ Pass |
+| 5     | gotui TUI Foundation      | ✅ Complete | ✅ Pass |
 
 ### ⏳ Final Step
 
@@ -19,11 +19,12 @@
 ## 🎯 What Works Now
 
 ### ✅ Complete Workflow
+
 ```
 CLI Command
   ↓
 User Authentication
-  ↓  
+  ↓
 Session Initialization
   ↓
 Layout Calculation (3-pane)
@@ -36,11 +37,13 @@ Keyboard Bindings Registration
 ```
 
 ### ✅ Database Integration
+
 - PostgreSQL with pgx/v5
 - Tables: consolidation_users, consolidation_flags, consolidation_reviews
 - Full persistence and state management
 
 ### ✅ Core Features
+
 - Hash-centric and filename-centric views
 - File flagging (Keep, Archive, Delete, Skip)
 - Real-time flag count display
@@ -50,12 +53,14 @@ Keyboard Bindings Registration
 ## 📦 Deliverables
 
 ### Infrastructure (359 files, ~12K LOC)
+
 - 15 packages
 - 32+ unit/integration tests
 - Database migrations
 - CLI commands (consolidate command complete)
 
 ### Phase 5 Artifacts
+
 1. Event Handler Framework (60 LOC)
 2. Status Widget (95 LOC)
 3. Layout Manager (60 LOC)
@@ -75,6 +80,7 @@ Keyboard Bindings Registration
 ✅ User can run: `filesprawl consolidate --across-remotes --review`
 
 This will:
+
 1. Index duplicates across remotes
 2. Create user session in database
 3. Initialize browsing layout (3-pane)
@@ -103,6 +109,7 @@ All are intentional and documented for final phase.
 ## 🎬 Next Session
 
 Ready to:
+
 1. Research gotui v5 App API
 2. Implement app.Run() integration
 3. Wire Grid container with widgets

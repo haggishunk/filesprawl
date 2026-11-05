@@ -17,14 +17,9 @@ import (
 // consider using a configuration implementation here
 // using file, env vars, args
 var (
-	noOutput  = false
-	baseURL   = "http://localhost:5572"
-	jsonInput = ""
-	authUser  = ""
-	authPass  = ""
-	loopback  = false
-	options   []string
-	arguments []string
+	baseURL  = "http://localhost:5572"
+	authUser = ""
+	authPass = ""
 )
 
 // Format an error and create a synthetic server return from it

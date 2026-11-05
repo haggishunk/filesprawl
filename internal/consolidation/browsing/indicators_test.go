@@ -19,9 +19,9 @@ func TestAnalyzeFileVersionPresence(t *testing.T) {
 	pa := NewPresenceAnalyzer()
 
 	tests := []struct {
-		name                string
-		locationCount       int
-		expectedIndicator   PresenceIndicator
+		name              string
+		locationCount     int
+		expectedIndicator PresenceIndicator
 	}{
 		{"No locations (critical)", 0, PresenceRed},
 		{"One location (critical)", 1, PresenceRed},
@@ -82,11 +82,11 @@ func TestAnalyzeLocationPresence(t *testing.T) {
 	pa := NewPresenceAnalyzer()
 
 	tests := []struct {
-		name                string
-		fileCount           int
-		totalVersions       int
-		expectedIndicator   PresenceIndicator
-		expectedContains    string
+		name              string
+		fileCount         int
+		totalVersions     int
+		expectedIndicator PresenceIndicator
+		expectedContains  string
 	}{
 		{"Empty location", 0, 2, PresenceRed, "No files"},
 		{"Single only copy", 1, 2, PresenceRed, "ONLY copy"},
@@ -127,8 +127,8 @@ func TestIndicatorDescription(t *testing.T) {
 
 func TestFormatLocationPresence(t *testing.T) {
 	loc := Location{
-		Name:     "archlinux/backup",
-		Type:     "remote",
+		Name:      "archlinux/backup",
+		Type:      "remote",
 		FileCount: 3,
 	}
 

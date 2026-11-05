@@ -1,8 +1,8 @@
 package browsing
 
 import (
-	"testing"
 	"github.com/haggishunk/filesprawl/internal/consolidation/flags"
+	"testing"
 )
 
 func TestSummaryRendererCreation(t *testing.T) {

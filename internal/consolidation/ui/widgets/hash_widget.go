@@ -87,7 +87,7 @@ func (w *HashCentricWidget) renderHashCentricList() {
 	}
 
 	if w.list != nil {
-		w.list.SetRows(rows)
+		_ = w.list.SetRows(rows)
 	}
 }
 

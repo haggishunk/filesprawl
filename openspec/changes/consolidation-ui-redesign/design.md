@@ -1,9 +1,11 @@
 # Design: Consolidation TUI Redesign - Bubble Tea with Side-by-Side Panels
 
 ## Context
+
 Current gotui implementation is monolithic and hard to extend. Bubble Tea provides better composability. Users need clear two-panel workflow: browse duplicates (left) → inspect files (right) → make decisions → execute.
 
 ## Goals
+
 1. **Clear Visual Hierarchy** - Banner, 2 panels, status bar all distinct
 2. **Keyboard-Driven Workflow** - Complete control without mouse
 3. **Data-Rich Display** - Show enough info to make smart deletion decisions
@@ -33,17 +35,20 @@ Current gotui implementation is monolithic and hard to extend. Bubble Tea provid
 ## Components
 
 ### 1. Banner (top)
+
 - Version, group count, mode (REVIEW/EXECUTE)
 - Remotes list
 - Brief keystroke reference
 
 ### 2. Hash List Panel (left 40%)
+
 - Duplicate groups listed by hash
 - Show: indicator + hash prefix + copy count + location count
 - Selection highlights current group
 - Keyboard: j/k to scroll, Enter to select
 
 ### 3. File Table Panel (right 60%)
+
 - All files in selected hash group
 - Columns: remote | filename | size | status
 - Optional column: filepath (via 'v' toggle for "wide" view)
@@ -52,12 +57,14 @@ Current gotui implementation is monolithic and hard to extend. Bubble Tea provid
 - Keyboard: j/k to scroll, space to flag
 
 ### 4. Status Bar (bottom)
+
 - Current actions available + deletion safety warning
 - Flag summary (X flagged for archive, etc.)
 
 ## Deletion Safety Logic
 
 Cannot mark a file for deletion if:
+
 - It's the only copy of (remote, filename) pair
 - Example: If hash group has:
   ```
@@ -69,16 +76,16 @@ Cannot mark a file for deletion if:
 
 ## Keyboard Shortcuts
 
-| Key | Action | Notes |
-|-----|--------|-------|
-| j/k | Navigate | Move selection up/down |
-| v | Toggle wide | Show/hide filepath column |
-| K | Flag KEEP | Keep this copy, suggest delete others |
-| a | Flag ARCHIVE | Archive this copy to backup |
-| d | Flag DELETE | Mark for deletion (safety checked) |
-| s | Skip/Clear | Clear all flags on current |
-| ? | Help | Show keyboard reference |
-| q | Quit | Review summary, save flags |
+| Key | Action       | Notes                                 |
+| --- | ------------ | ------------------------------------- |
+| j/k | Navigate     | Move selection up/down                |
+| v   | Toggle wide  | Show/hide filepath column             |
+| K   | Flag KEEP    | Keep this copy, suggest delete others |
+| a   | Flag ARCHIVE | Archive this copy to backup           |
+| d   | Flag DELETE  | Mark for deletion (safety checked)    |
+| s   | Skip/Clear   | Clear all flags on current            |
+| ?   | Help         | Show keyboard reference               |
+| q   | Quit         | Review summary, save flags            |
 
 ## Data Flow
 
