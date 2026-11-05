@@ -38,7 +38,7 @@ func doCall(ctx context.Context, path string, in rc.Params) (out rc.Params, err 
 
 	// fmt.Printf("Calling path: %s\n", requestURL)
 
-	// fmt.Printf("With params: %s", in)
+	// fmt.Printf("With params: %v\n", in)
 
 	data, err := json.Marshal(in)
 	if err != nil {
