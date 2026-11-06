@@ -6,7 +6,7 @@ After merging the RC fix PR and reorganizing commits from `local/sidestep`.
 
 ### ✅ feat/bubble-tea-ui-consolidation
 
-- **Commits**: 19 ahead of main (includes test fixes)
+- **Commits**: 18 ahead of main
 - **Base**: origin/main (6d049d4)
 - **Contents**:
   - Bubble Tea UI components (Phase 2-4)
@@ -16,10 +16,9 @@ After merging the RC fix PR and reorganizing commits from `local/sidestep`.
   - Filepath construction fixes (local vs rclone)
   - Filename-based duplicate detection and grouping
   - Help modal, focus switching, keybindings
-  - **Updated integration tests** ✅ All 6 passing
 
-**Status**: Code complete and tested
-**Action**: Create PR for review and merge
+**Status**: Code complete, needs integration test updates  
+**Action**: Review, fix repository tests, create PR
 
 ### ✅ openspec/optimize-incremental-scanning
 
@@ -53,8 +52,7 @@ After merging the RC fix PR and reorganizing commits from `local/sidestep`.
 
 ## Total Work Summary
 
-- **22 new commits** organized across 3 production branches
+- **21 new commits** organized across 3 production branches
 - **RC fix already merged** to main via PR #14
 - **All branches cleanly based** on origin/main
-- **Repository integration tests**: ✅ All 6 passing
-- **Ready for PR creation and merge**
+- **Ready for testing and PR creation**

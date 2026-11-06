@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -82,16 +83,13 @@ func writeMetaRaw(t *testing.T, ctx context.Context, repo *ObjectRepository, nam
 		t.Fatalf("seed location: %v", err)
 	}
 
-	// For local files, object_path stores the absolute filesystem path
+	// Build absolute path (local format: scan_root/path)
 	absPath := filepath.Join("/integ", path)
-
-	// Extract directory from path (everything before the last /)
-	objDir := filepath.Dir(absPath)
 
 	var id int
 	err = repo.db.QueryRow(ctx,
-		`INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, location_id, object_directory) VALUES ($1, $2, $3, 512, $4, $5) RETURNING id`,
-		name, absPath, mime, locationID, objDir,
+		`INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, location_id, absolute_path) VALUES ($1, $2, $3, 512, $4, $5) RETURNING id`,
+		name, path, mime, locationID, absPath,
 	).Scan(&id)
 	if err != nil {
 		t.Fatalf("seed meta: %v", err)
@@ -290,15 +288,17 @@ func TestIntegration_PersistLocalResult_ScanRootDeduplication(t *testing.T) {
 	// Same file name and content scanned under two different roots
 	hashVal := "integ-crossroot-hash-" + stamp
 	hashes := map[string]string{"md5": hashVal}
-	// For local scans, object_path stores the absolute filesystem path
-	mA := object.NewMeta("a.jpg", filepath.Join(rootA, "a.jpg"), "image/jpeg",
+	// LocationId and AbsolutePath must be set for local scans
+	mA := object.NewMeta("a.jpg", "a.jpg", "image/jpeg",
 		object.WithMetaSize(512),
 		object.WithMetaScanRoot(rootA),
-		object.WithMetaLocationId(remA.Location.Id))
-	mB := object.NewMeta("a.jpg", filepath.Join(rootB, "a.jpg"), "image/jpeg",
+		object.WithMetaLocationId(remA.Location.Id),
+		object.WithMetaAbsolutePath(filepath.Join(rootA, "a.jpg")))
+	mB := object.NewMeta("a.jpg", "a.jpg", "image/jpeg",
 		object.WithMetaSize(512),
 		object.WithMetaScanRoot(rootB),
-		object.WithMetaLocationId(remB.Location.Id))
+		object.WithMetaLocationId(remB.Location.Id),
+		object.WithMetaAbsolutePath(filepath.Join(rootB, "a.jpg")))
 
 	defer func() {
 		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_meta_id IN ($1, $2)`, mA.Id, mB.Id)
@@ -358,10 +358,11 @@ func TestIntegration_PersistLocalResult_ScanRootDeduplication(t *testing.T) {
 	}
 
 	// Rescanning the same root reuses the existing record (idempotent)
-	mA2 := object.NewMeta("a.jpg", filepath.Join(rootA, "a.jpg"), "image/jpeg",
+	mA2 := object.NewMeta("a.jpg", "a.jpg", "image/jpeg",
 		object.WithMetaSize(512),
 		object.WithMetaScanRoot(rootA),
-		object.WithMetaLocationId(remA.Location.Id))
+		object.WithMetaLocationId(remA.Location.Id),
+		object.WithMetaAbsolutePath(filepath.Join(rootA, "a.jpg")))
 	if err := repo.PersistLocalResult(ctx, &remA, &mA2, hashes); err != nil {
 		t.Fatalf("rescan root A: %v", err)
 	}
@@ -385,11 +386,12 @@ func TestIntegration_PersistLocalResult_SymlinkMarked(t *testing.T) {
 	}
 	rem.LocationId = rem.Location.Id
 
-	m := object.NewMeta("link.txt", filepath.Join(root, "link.txt"), "application/octet-stream",
+	m := object.NewMeta("link.txt", "link.txt", "application/octet-stream",
 		object.WithMetaSize(8),
 		object.WithMetaSymlink(true),
 		object.WithMetaScanRoot(root),
-		object.WithMetaLocationId(rem.Location.Id))
+		object.WithMetaLocationId(rem.Location.Id),
+		object.WithMetaAbsolutePath(filepath.Join(root, "link.txt")))
 
 	defer func() {
 		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_meta_id = $1`, m.Id)

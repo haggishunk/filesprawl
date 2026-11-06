@@ -321,9 +321,16 @@ func (r *ObjectRepository) PersistResult(ctx context.Context, rem *remote.Remote
 		}
 	}
 
+	// Build absolute path (remote format: remote_name:path)
+	absolutePath := rem.Location.Name + ":" + lri.Path
+
 	// get or set object meta
-	// Note: LocationId and AbsolutePath must be set on the Meta before calling this method
-	m := object.NewMeta(lri.Name, lri.Path, lri.MimeType, object.WithMetaSize(lri.Size), object.WithMetaScanRoot(scanRoot))
+	// LocationId and AbsolutePath are required fields
+	m := object.NewMeta(lri.Name, lri.Path, lri.MimeType,
+		object.WithMetaSize(lri.Size),
+		object.WithMetaScanRoot(scanRoot),
+		object.WithMetaLocationId(rem.Location.Id),
+		object.WithMetaAbsolutePath(absolutePath))
 	fmt.Printf("Found object meta: %s\n", m)
 	err := r.ReadMeta(ctx, &m)
 	if err != nil {
