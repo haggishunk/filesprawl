@@ -61,14 +61,16 @@ func runIndexCmd(cmd *cobra.Command, _ []string) error {
 
 	rem := remote.NewRcloneRemote(remoteName, indexPath)
 
+	// Ensure location exists first (necessary for both scanning and incremental mode)
+	if err := repo.EnsureLocation(ctx, &rem.Location); err != nil {
+		return fmt.Errorf("failed to ensure location: %w", err)
+	}
+	// Update remote's LocationId from the ensured location
+	rem.LocationId = rem.Location.Id
+
 	// If using --only-missing-dirs, fetch the set of already-scanned directories
 	var scannedDirs map[string]bool
 	if indexOnlyMissingDirs {
-		// Ensure location exists
-		if err := repo.EnsureLocation(ctx, &rem.Location); err != nil {
-			return fmt.Errorf("failed to ensure location: %w", err)
-		}
-
 		scannedDirs, err = repo.GetScannedDirectories(ctx, rem.Location.Id)
 		if err != nil {
 			return fmt.Errorf("failed to get scanned directories: %w", err)
