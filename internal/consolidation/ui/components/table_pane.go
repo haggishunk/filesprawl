@@ -199,10 +199,9 @@ func (tp *TablePane) renderFileLine(buf *strings.Builder, version browsing.FileV
 	// AbsolutePath contains the full path ready to display
 	// Local: /full/filesystem/path
 	// Remote: remote_name:path/within/remote
+	// Note: Path now stores the absolute path for local files
 	filepath := ""
-	if version.FileInfo != nil && version.FileInfo.AbsolutePath != "" {
-		filepath = version.FileInfo.AbsolutePath
-	} else if version.FileInfo != nil {
+	if version.FileInfo != nil {
 		filepath = version.FileInfo.Path
 	}
 

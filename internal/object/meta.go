@@ -21,9 +21,7 @@ type Meta struct {
 	ScanRoot string
 	// LocationId references the location table (identifies file source)
 	LocationId int
-	// AbsolutePath is the full path to the file (replaces relative path + reconstruction)
-	AbsolutePath string
-	Persisted    bool
+	Persisted  bool
 }
 
 func (o Meta) String() string {
@@ -79,12 +77,5 @@ func WithMetaScanRoot(root string) MetaOption {
 func WithMetaLocationId(locId int) MetaOption {
 	return func(o *Meta) {
 		o.LocationId = locId
-	}
-}
-
-// WithMetaAbsolutePath sets the absolute path to the file
-func WithMetaAbsolutePath(absPath string) MetaOption {
-	return func(o *Meta) {
-		o.AbsolutePath = absPath
 	}
 }

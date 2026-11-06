@@ -44,14 +44,13 @@ func toFileVersions(files []analysis.FileInfo, hashValue, hashType string) []bro
 		locations := extractLocations(files, file)
 
 		meta := &object.Meta{
-			Id:           file.ID,
-			Name:         file.Name,
-			Path:         file.Path,
-			MimeType:     file.MimeType,
-			Size:         file.Size,
-			LocationId:   file.LocationId,
-			AbsolutePath: file.AbsolutePath,
-			Persisted:    true,
+			Id:         file.ID,
+			Name:       file.Name,
+			Path:       file.Path,
+			MimeType:   file.MimeType,
+			Size:       file.Size,
+			LocationId: file.LocationId,
+			Persisted:  true,
 		}
 
 		hash := &object.Hash{

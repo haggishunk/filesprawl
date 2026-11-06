@@ -22,11 +22,10 @@ CREATE TABLE IF NOT EXISTS object_meta (
   object_mime_type TEXT NOT NULL,
   object_size BIGINT NOT NULL DEFAULT 0,
   is_symlink BOOLEAN NOT NULL DEFAULT false,
-  location_id INT NOT NULL REFERENCES location(id) ON DELETE RESTRICT,
-  absolute_path TEXT NOT NULL
+  location_id INT NOT NULL REFERENCES location(id) ON DELETE RESTRICT
 );
 
-CREATE INDEX IF NOT EXISTS idx_object_meta_location_path ON object_meta (location_id, absolute_path);
+CREATE INDEX IF NOT EXISTS idx_object_meta_location_path ON object_meta (location_id, object_path);
 
 CREATE TABLE IF NOT EXISTS object_hash_junction (
   id SERIAL PRIMARY KEY,

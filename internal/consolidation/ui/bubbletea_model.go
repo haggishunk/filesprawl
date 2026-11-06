@@ -539,12 +539,8 @@ func (m *ConsolidationModel) constructFilePath(version *browsing.FileVersion) st
 		return ""
 	}
 
-	// AbsolutePath contains the full, ready-to-use path
-	if version.FileInfo.AbsolutePath != "" {
-		return version.FileInfo.AbsolutePath
-	}
-
-	// Fallback if AbsolutePath not set
+	// Path now contains the full, ready-to-use path
+	// (absolute path for local files, path within remote for remote files)
 	return version.FileInfo.Path
 }
 
