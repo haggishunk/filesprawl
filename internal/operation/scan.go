@@ -33,14 +33,18 @@ type Scanner struct {
 	Remote *remote.Remote
 	Repo   *repository.ObjectRepository
 	// ScanRoot is the remote path the scan was started at
-	ScanRoot string
+	ScanRoot        string
+	OnlyMissingDirs bool
+	ScannedDirs     map[string]bool // Pre-computed scanned directories for filtering
 	// writer channel
 }
 
 type ScannerOpt func(s *Scanner)
 
 func NewScanner(options ...ScannerOpt) Scanner {
-	s := Scanner{}
+	s := Scanner{
+		ScannedDirs: make(map[string]bool),
+	}
 
 	for _, opt := range options {
 		opt(&s)
@@ -68,6 +72,20 @@ func WithScanRoot(root string) ScannerOpt {
 	}
 }
 
+// WithScannerOnlyMissingDirs enables incremental scanning mode
+func WithScannerOnlyMissingDirs(only bool) ScannerOpt {
+	return func(s *Scanner) {
+		s.OnlyMissingDirs = only
+	}
+}
+
+// WithScannerScannedDirs sets the pre-computed set of scanned directories
+func WithScannerScannedDirs(dirs map[string]bool) ScannerOpt {
+	return func(s *Scanner) {
+		s.ScannedDirs = dirs
+	}
+}
+
 // Scan handles scanning of a remote
 func Scan(ctx context.Context, s *Scanner, lc rclone.ListConfig) error {
 	// On first call, ensure location exists for this remote
@@ -86,6 +104,11 @@ func Scan(ctx context.Context, s *Scanner, lc rclone.ListConfig) error {
 	// starting with files only
 	if lc.Opt.DirsOnly {
 		for _, lri := range lr.List {
+			// Skip directories that have already been scanned if in incremental mode
+			if s.OnlyMissingDirs && s.ScannedDirs[lri.Path] {
+				fmt.Printf("Skipping already scanned directory: %s\n", lri.Path)
+				continue
+			}
 			fmt.Printf("Descending into path: %s\n", lri.Path)
 			newLo := rclone.NewListOption(rclone.ListOptionFilesOnly())
 			newLc := rclone.NewListConfig(lc.Fs, lri.Path, &newLo)

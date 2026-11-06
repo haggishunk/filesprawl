@@ -113,13 +113,15 @@ func (r *ObjectRepository) WriteMeta(ctx context.Context, m *object.Meta) error 
 	// return new or existing id
 	var id int
 
+	// Extract directory from path (everything before the last /)
+	// BasePath is already calculated in object.NewMeta using path.Dir()
 	statement := `
-		INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, is_symlink, location_id)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, is_symlink, location_id, object_directory)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id;
 	`
 
-	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.Size, m.IsSymlink, m.LocationId)
+	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.Size, m.IsSymlink, m.LocationId, m.BasePath)
 	err := row.Scan(&id)
 
 	if err != nil {
@@ -839,4 +841,37 @@ func (r *ObjectRepository) GetFilesByFilename(ctx context.Context, filename stri
 	}
 
 	return records, nil
+}
+
+// GetScannedDirectories returns all unique directories that have been indexed
+// for a given location. Used by --only-missing-dirs flag to find directories
+// that still need to be scanned.
+func (r *ObjectRepository) GetScannedDirectories(ctx context.Context, locationID int) (map[string]bool, error) {
+	statement := `
+		SELECT DISTINCT object_directory
+		FROM object_meta
+		WHERE location_id = $1 AND object_directory != ''
+		ORDER BY object_directory;
+	`
+
+	rows, err := r.db.Query(ctx, statement, locationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query scanned directories: %w", err)
+	}
+	defer rows.Close()
+
+	scannedDirs := make(map[string]bool)
+	for rows.Next() {
+		var dir string
+		if err := rows.Scan(&dir); err != nil {
+			return nil, fmt.Errorf("failed to scan directory: %w", err)
+		}
+		scannedDirs[dir] = true
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating directories: %w", err)
+	}
+
+	return scannedDirs, nil
 }

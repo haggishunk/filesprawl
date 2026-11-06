@@ -86,10 +86,13 @@ func writeMetaRaw(t *testing.T, ctx context.Context, repo *ObjectRepository, nam
 	// For local files, object_path stores the absolute filesystem path
 	absPath := filepath.Join("/integ", path)
 
+	// Extract directory from path (everything before the last /)
+	objDir := filepath.Dir(absPath)
+
 	var id int
 	err = repo.db.QueryRow(ctx,
-		`INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, location_id) VALUES ($1, $2, $3, 512, $4) RETURNING id`,
-		name, absPath, mime, locationID,
+		`INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, location_id, object_directory) VALUES ($1, $2, $3, 512, $4, $5) RETURNING id`,
+		name, absPath, mime, locationID, objDir,
 	).Scan(&id)
 	if err != nil {
 		t.Fatalf("seed meta: %v", err)

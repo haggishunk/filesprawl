@@ -26,14 +26,18 @@ type localPersister interface {
 
 // LocalScanner walks the local filesystem and computes hashes
 type LocalScanner struct {
-	Root string
-	Repo localPersister
+	Root            string
+	Repo            localPersister
+	OnlyMissingDirs bool
+	ScannedDirs     map[string]bool // Pre-computed scanned directories for filtering
 }
 
 type LocalScannerOpt func(s *LocalScanner)
 
 func NewLocalScanner(options ...LocalScannerOpt) LocalScanner {
-	s := LocalScanner{}
+	s := LocalScanner{
+		ScannedDirs: make(map[string]bool),
+	}
 	for _, opt := range options {
 		opt(&s)
 	}
@@ -49,6 +53,20 @@ func WithLocalRoot(root string) LocalScannerOpt {
 func WithLocalRepo(r *repository.ObjectRepository) LocalScannerOpt {
 	return func(s *LocalScanner) {
 		s.Repo = r
+	}
+}
+
+// WithOnlyMissingDirs enables incremental scanning mode
+func WithOnlyMissingDirs(only bool) LocalScannerOpt {
+	return func(s *LocalScanner) {
+		s.OnlyMissingDirs = only
+	}
+}
+
+// WithScannedDirs sets the pre-computed set of scanned directories
+func WithScannedDirs(dirs map[string]bool) LocalScannerOpt {
+	return func(s *LocalScanner) {
+		s.ScannedDirs = dirs
 	}
 }
 
@@ -85,6 +103,14 @@ func ScanLocal(ctx context.Context, ls *LocalScanner) error {
 		}
 
 		if d.IsDir() {
+			// Check if this directory should be skipped in incremental mode
+			if ls.OnlyMissingDirs {
+				// Check if this directory has already been scanned
+				if ls.ScannedDirs[filePath] {
+					// Skip this entire directory tree
+					return filepath.SkipDir
+				}
+			}
 			return nil
 		}
 
