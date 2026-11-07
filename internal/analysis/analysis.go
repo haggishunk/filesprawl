@@ -29,7 +29,6 @@ type FileInfo struct {
 	MimeType     string
 	Size         int64
 	LocationId   int
-	AbsolutePath string
 	LocationName string
 	LocationType string
 }
@@ -135,7 +134,6 @@ func (d *DuplicateDetector) enrichFilenames(ctx context.Context, groups []reposi
 				MimeType:     rec.MimeType,
 				Size:         rec.Size,
 				LocationId:   rec.LocationId,
-				AbsolutePath: rec.AbsolutePath,
 				LocationName: rec.LocationName,
 				LocationType: rec.LocationType,
 			}
@@ -190,7 +188,6 @@ func (d *DuplicateDetector) enrich(ctx context.Context, groups []repository.Hash
 				MimeType:     rec.MimeType,
 				Size:         rec.Size,
 				LocationId:   rec.LocationId,
-				AbsolutePath: rec.AbsolutePath,
 				LocationName: rec.LocationName,
 				LocationType: rec.LocationType,
 			}
@@ -220,7 +217,7 @@ func FormatReport(groups []DuplicateGroup) string {
 			if f.LocationType != "" {
 				location = f.LocationName + " (" + f.LocationType + ")"
 			}
-			fmt.Fprintf(&sb, "  • %s  [%s]  %d bytes  location: %s  path: %s\n", f.Name, f.Path, f.Size, location, f.AbsolutePath)
+			fmt.Fprintf(&sb, "  • %s  [%s]  %d bytes  location: %s  path: %s\n", f.Name, f.Path, f.Size, location, f.Path)
 		}
 		sb.WriteString("\n")
 	}

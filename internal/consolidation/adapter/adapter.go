@@ -50,7 +50,7 @@ func toFileVersions(files []analysis.FileInfo, hashValue, hashType string) []bro
 			MimeType:     file.MimeType,
 			Size:         file.Size,
 			LocationId:   file.LocationId,
-			AbsolutePath: file.AbsolutePath,
+			AbsolutePath: file.Path, // In converged schema, Path contains the absolute path
 			Persisted:    true,
 		}
 

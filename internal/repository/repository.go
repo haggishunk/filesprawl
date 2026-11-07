@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"fmt"
-	"path"
 
 	"github.com/haggishunk/filesprawl/internal/database"
 	"github.com/haggishunk/filesprawl/internal/location"
@@ -36,7 +35,6 @@ type FileRecord struct {
 	MimeType     string
 	Size         int64
 	LocationId   int
-	AbsolutePath string
 	LocationName string
 	LocationType string
 }
@@ -115,24 +113,15 @@ func (r *ObjectRepository) WriteMeta(ctx context.Context, m *object.Meta) error 
 	// return new or existing id
 	var id int
 
-	// object_path now stores the absolute path (per converged schema)
-	// For local files: absolute filesystem path
-	// For remote files: path-within-remote
-	objectPath := m.AbsolutePath
-	if objectPath == "" {
-		objectPath = m.Path
-	}
-
-	// Extract directory from absolute path
-	objectDir := path.Dir(objectPath)
-
+	// Extract directory from path (everything before the last /)
+	// BasePath is already calculated in object.NewMeta using path.Dir()
 	statement := `
 		INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, is_symlink, location_id, object_directory)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id;
 	`
 
-	row := r.db.QueryRow(ctx, statement, m.Name, objectPath, m.MimeType, m.Size, m.IsSymlink, m.LocationId, objectDir)
+	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.Size, m.IsSymlink, m.LocationId, m.BasePath)
 	err := row.Scan(&id)
 
 	if err != nil {
@@ -152,19 +141,14 @@ func (r *ObjectRepository) ReadMeta(ctx context.Context, m *object.Meta) error {
 	var isSymlink bool
 	var locationId int
 
-	// Use absolute path for lookup (per converged schema)
-	objectPath := m.AbsolutePath
-	if objectPath == "" {
-		objectPath = m.Path
-	}
-
 	statement := `
 		SELECT id, object_size, is_symlink, location_id
 		FROM object_meta
-		WHERE object_name = $1 AND object_path = $2 AND object_mime_type = $3 AND location_id = $4;
+		WHERE object_name = $1 AND object_path = $2 AND object_mime_type = $3
+		  AND location_id = $4;
 	`
 
-	row := r.db.QueryRow(ctx, statement, m.Name, objectPath, m.MimeType, m.LocationId)
+	row := r.db.QueryRow(ctx, statement, m.Name, m.Path, m.MimeType, m.LocationId)
 	err := row.Scan(&id, &size, &isSymlink, &locationId)
 
 	if err != nil {
@@ -334,16 +318,13 @@ func (r *ObjectRepository) PersistResult(ctx context.Context, rem *remote.Remote
 		}
 	}
 
-	// Build absolute path (remote format: remote_name:path)
-	absolutePath := rem.Location.Name + ":" + lri.Path
-
 	// get or set object meta
-	// LocationId and AbsolutePath are required fields
+	// For remotes, object_path is the path within the remote (lri.Path)
+	// LocationId is required field
 	m := object.NewMeta(lri.Name, lri.Path, lri.MimeType,
 		object.WithMetaSize(lri.Size),
 		object.WithMetaScanRoot(scanRoot),
-		object.WithMetaLocationId(rem.Location.Id),
-		object.WithMetaAbsolutePath(absolutePath))
+		object.WithMetaLocationId(rem.Location.Id))
 	fmt.Printf("Found object meta: %s\n", m)
 	err := r.ReadMeta(ctx, &m)
 	if err != nil {
@@ -612,8 +593,6 @@ func (r *ObjectRepository) GetFilesByHash(ctx context.Context, hashValue, hashTy
 		if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size, &f.LocationId, &f.LocationName, &f.LocationType); err != nil {
 			return nil, fmt.Errorf("failed to scan file record: %w", err)
 		}
-		// In the converged schema, object_path stores the absolute path
-		f.AbsolutePath = f.Path
 		records = append(records, f)
 	}
 	if err := rows.Err(); err != nil {
@@ -695,8 +674,6 @@ func (r *ObjectRepository) GetFilesByHashes(ctx context.Context, hashes []HashTy
 			if err := rows.Scan(&f.ID, &f.Name, &f.Path, &f.MimeType, &f.Size, &f.LocationId, &f.LocationName, &f.LocationType, &hashValue, &hashType); err != nil {
 				return nil, fmt.Errorf("failed to scan file record in batch: %w", err)
 			}
-			// In the converged schema, object_path stores the absolute path
-			f.AbsolutePath = f.Path
 			key := hashValue + ":" + hashType
 			result[key] = append(result[key], f)
 		}
@@ -856,8 +833,6 @@ func (r *ObjectRepository) GetFilesByFilename(ctx context.Context, filename stri
 			&f.LocationId, &f.LocationName, &f.LocationType); err != nil {
 			return nil, fmt.Errorf("failed to scan file record: %w", err)
 		}
-		// In the converged schema, object_path stores the absolute path
-		f.AbsolutePath = f.Path
 		records = append(records, f)
 	}
 
@@ -866,4 +841,37 @@ func (r *ObjectRepository) GetFilesByFilename(ctx context.Context, filename stri
 	}
 
 	return records, nil
+}
+
+// GetScannedDirectories returns all unique directories that have been indexed
+// for a given location. Used by --only-missing-dirs flag to find directories
+// that still need to be scanned.
+func (r *ObjectRepository) GetScannedDirectories(ctx context.Context, locationID int) (map[string]bool, error) {
+	statement := `
+		SELECT DISTINCT object_directory
+		FROM object_meta
+		WHERE location_id = $1 AND object_directory != ''
+		ORDER BY object_directory;
+	`
+
+	rows, err := r.db.Query(ctx, statement, locationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query scanned directories: %w", err)
+	}
+	defer rows.Close()
+
+	scannedDirs := make(map[string]bool)
+	for rows.Next() {
+		var dir string
+		if err := rows.Scan(&dir); err != nil {
+			return nil, fmt.Errorf("failed to scan directory: %w", err)
+		}
+		scannedDirs[dir] = true
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating directories: %w", err)
+	}
+
+	return scannedDirs, nil
 }

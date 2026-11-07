@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -72,10 +71,10 @@ func writeRaw(t *testing.T, ctx context.Context, repo *ObjectRepository, hashVal
 func writeMetaRaw(t *testing.T, ctx context.Context, repo *ObjectRepository, name, path, mime string) int {
 	t.Helper()
 
-	// Create or get a test location - use name hash to ensure uniqueness
+	// Create or get a test location
 	var locationID int
-	stamp := time.Now().UnixNano()
-	locName := fmt.Sprintf("integ_location_%d_%s", stamp, name)
+	stamp := time.Now().Format("150405.000")
+	locName := "integ_location_" + stamp
 	err := repo.db.QueryRow(ctx,
 		`INSERT INTO location (name, type) VALUES ($1, 'local') ON CONFLICT (name, type) DO UPDATE SET id = location.id RETURNING id`,
 		locName,
@@ -84,16 +83,16 @@ func writeMetaRaw(t *testing.T, ctx context.Context, repo *ObjectRepository, nam
 		t.Fatalf("seed location: %v", err)
 	}
 
-	// Build absolute path (local format: scan_root/path)
+	// For local files, object_path stores the absolute filesystem path
 	absPath := filepath.Join("/integ", path)
 
-	// Extract directory from absolute path
+	// Extract directory from path (everything before the last /)
 	objDir := filepath.Dir(absPath)
 
 	var id int
 	err = repo.db.QueryRow(ctx,
 		`INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, location_id, object_directory) VALUES ($1, $2, $3, 512, $4, $5) RETURNING id`,
-		name, path, mime, locationID, objDir,
+		name, absPath, mime, locationID, objDir,
 	).Scan(&id)
 	if err != nil {
 		t.Fatalf("seed meta: %v", err)
@@ -276,8 +275,8 @@ func TestIntegration_PersistLocalResult_ScanRootDeduplication(t *testing.T) {
 	stamp := time.Now().Format("150405.000")
 	rootA := "/integ/photos-" + stamp
 	rootB := "/integ/photos-alt-" + stamp
-	remA := remote.NewLocalRemote("integ-host-a", rootA)
-	remB := remote.NewLocalRemote("integ-host-b", rootB)
+	remA := remote.NewLocalRemote("integ-host", rootA)
+	remB := remote.NewLocalRemote("integ-host", rootB)
 
 	// Ensure locations exist and are persisted
 	if err := repo.EnsureLocation(ctx, &remA.Location); err != nil {
@@ -292,17 +291,15 @@ func TestIntegration_PersistLocalResult_ScanRootDeduplication(t *testing.T) {
 	// Same file name and content scanned under two different roots
 	hashVal := "integ-crossroot-hash-" + stamp
 	hashes := map[string]string{"md5": hashVal}
-	// LocationId and AbsolutePath must be set for local scans
-	mA := object.NewMeta("a.jpg", "a.jpg", "image/jpeg",
+	// For local scans, object_path stores the absolute filesystem path
+	mA := object.NewMeta("a.jpg", filepath.Join(rootA, "a.jpg"), "image/jpeg",
 		object.WithMetaSize(512),
 		object.WithMetaScanRoot(rootA),
-		object.WithMetaLocationId(remA.Location.Id),
-		object.WithMetaAbsolutePath(filepath.Join(rootA, "a.jpg")))
-	mB := object.NewMeta("a.jpg", "a.jpg", "image/jpeg",
+		object.WithMetaLocationId(remA.Location.Id))
+	mB := object.NewMeta("a.jpg", filepath.Join(rootB, "a.jpg"), "image/jpeg",
 		object.WithMetaSize(512),
 		object.WithMetaScanRoot(rootB),
-		object.WithMetaLocationId(remB.Location.Id),
-		object.WithMetaAbsolutePath(filepath.Join(rootB, "a.jpg")))
+		object.WithMetaLocationId(remB.Location.Id))
 
 	defer func() {
 		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_meta_id IN ($1, $2)`, mA.Id, mB.Id)
@@ -346,27 +343,27 @@ func TestIntegration_PersistLocalResult_ScanRootDeduplication(t *testing.T) {
 	if len(records) != 2 {
 		t.Fatalf("expected 2 records from two roots, got %d", len(records))
 	}
-	// Verify we got files from both roots by checking absolute paths
+	// Verify we got files from both roots by checking object paths
+	// (which now stores the absolute filesystem path for local files)
 	foundRootA := false
 	foundRootB := false
 	for _, r := range records {
-		if strings.HasPrefix(r.AbsolutePath, rootA) {
+		if strings.HasPrefix(r.Path, rootA) {
 			foundRootA = true
 		}
-		if strings.HasPrefix(r.AbsolutePath, rootB) {
+		if strings.HasPrefix(r.Path, rootB) {
 			foundRootB = true
 		}
 	}
 	if !foundRootA || !foundRootB {
-		t.Fatalf("expected absolute paths from roots %s and %s, got %v", rootA, rootB, records)
+		t.Fatalf("expected paths from roots %s and %s, got %v", rootA, rootB, records)
 	}
 
 	// Rescanning the same root reuses the existing record (idempotent)
-	mA2 := object.NewMeta("a.jpg", "a.jpg", "image/jpeg",
+	mA2 := object.NewMeta("a.jpg", filepath.Join(rootA, "a.jpg"), "image/jpeg",
 		object.WithMetaSize(512),
 		object.WithMetaScanRoot(rootA),
-		object.WithMetaLocationId(remA.Location.Id),
-		object.WithMetaAbsolutePath(filepath.Join(rootA, "a.jpg")))
+		object.WithMetaLocationId(remA.Location.Id))
 	if err := repo.PersistLocalResult(ctx, &remA, &mA2, hashes); err != nil {
 		t.Fatalf("rescan root A: %v", err)
 	}
@@ -390,12 +387,11 @@ func TestIntegration_PersistLocalResult_SymlinkMarked(t *testing.T) {
 	}
 	rem.LocationId = rem.Location.Id
 
-	m := object.NewMeta("link.txt", "link.txt", "application/octet-stream",
+	m := object.NewMeta("link.txt", filepath.Join(root, "link.txt"), "application/octet-stream",
 		object.WithMetaSize(8),
 		object.WithMetaSymlink(true),
 		object.WithMetaScanRoot(root),
-		object.WithMetaLocationId(rem.Location.Id),
-		object.WithMetaAbsolutePath(filepath.Join(root, "link.txt")))
+		object.WithMetaLocationId(rem.Location.Id))
 
 	defer func() {
 		_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_meta_id = $1`, m.Id)
@@ -433,12 +429,6 @@ func TestGetFilesByHashes(t *testing.T) {
 	pool := openTestDB(t)
 	repo := NewObjectRepository(database.NewPgxDatabase(pool))
 	ctx := context.Background()
-
-	// Clean up any leftover test data from previous runs
-	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id IN (
-		SELECT id FROM object_hash WHERE hash_value IN ('batch_hash_1', 'batch_hash_2', 'batch_hash_3')
-	)`)
-	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE hash_value IN ('batch_hash_1', 'batch_hash_2', 'batch_hash_3')`)
 
 	// Create 3 hashes with 2 files each = 6 total files
 	hash1 := writeRaw(t, ctx, repo, "batch_hash_1", "md5")
@@ -577,13 +567,12 @@ func writeMetaWithSize(t *testing.T, ctx context.Context, repo *ObjectRepository
 	return m.Id
 }
 
-// Helper to write metadata with location_id and absolute_path
-func writeMetaWithLocationAndPath(t *testing.T, ctx context.Context, repo *ObjectRepository, name, path, mime string, locationId int, absolutePath string) int {
+// Helper to write metadata with location_id (absolute_path parameter kept for compatibility)
+func writeMetaWithLocationAndPath(t *testing.T, ctx context.Context, repo *ObjectRepository, name, path, mime string, locationId int, _ string) int {
 	t.Helper()
 	m := object.NewMeta(name, path, mime)
 	m.Size = 512
 	m.LocationId = locationId
-	m.AbsolutePath = absolutePath
 	if err := repo.WriteMeta(ctx, &m); err != nil {
 		t.Fatalf("WriteMeta failed: %v", err)
 	}
