@@ -125,8 +125,8 @@ func Scan(ctx context.Context, s *Scanner, lc rclone.ListConfig) error {
 		for _, lri := range lr.List {
 			fmt.Printf("Found file: %s\n", lri)
 
-			// Create Meta with LocationId set
-			// For remotes, object_path is the path within the remote
+			// Build Meta with LocationId set
+			// Path stores the path within the remote
 			meta := object.NewMeta(lri.Name, lri.Path, lri.MimeType,
 				object.WithMetaSize(lri.Size),
 				object.WithMetaScanRoot(s.ScanRoot),

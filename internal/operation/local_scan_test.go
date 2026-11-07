@@ -178,11 +178,10 @@ func TestScanLocalSkipsDirectorySymlink(t *testing.T) {
 	if len(fake.calls) != 1 {
 		t.Fatalf("expected only subdir/nested.txt to be persisted, got %d entries", len(fake.calls))
 	}
-	if _, ok := byPath[filepath.Join("subdir", "nested.txt")]; !ok {
-		t.Fatalf("expected subdir/nested.txt to be persisted, got %v", byPath)
-	}
-	if _, ok := byPath["dirlink"]; ok {
-		t.Fatalf("directory symlink must not be persisted")
+	// Path now stores absolute filesystem paths (converged schema)
+	expectedPath := filepath.Join(root, "subdir", "nested.txt")
+	if _, ok := byPath[expectedPath]; !ok {
+		t.Fatalf("expected %s to be persisted, got %v", expectedPath, byPath)
 	}
 }
 
@@ -206,7 +205,9 @@ func TestScanLocalMarksFileSymlink(t *testing.T) {
 		t.Fatalf("expected 2 persisted entries, got %d", len(fake.calls))
 	}
 
-	link, ok := byPath["link.txt"]
+	// Path now stores absolute filesystem paths (converged schema)
+	linkPath := filepath.Join(root, "link.txt")
+	link, ok := byPath[linkPath]
 	if !ok {
 		t.Fatalf("expected link.txt to be persisted")
 	}
@@ -217,7 +218,8 @@ func TestScanLocalMarksFileSymlink(t *testing.T) {
 		t.Fatalf("symlink must not be hashed, got %v", link.hashes)
 	}
 
-	real, ok := byPath["real.txt"]
+	realPath := filepath.Join(root, "real.txt")
+	real, ok := byPath[realPath]
 	if !ok {
 		t.Fatalf("expected real.txt to be persisted")
 	}
@@ -244,7 +246,9 @@ func TestScanLocalRecordsBrokenSymlink(t *testing.T) {
 	}
 
 	byPath := persistsByPath(fake)
-	link, ok := byPath["broken.txt"]
+	// Path now stores absolute filesystem paths (converged schema)
+	brokenPath := filepath.Join(root, "broken.txt")
+	link, ok := byPath[brokenPath]
 	if !ok {
 		t.Fatalf("expected broken.txt to be persisted")
 	}
@@ -277,8 +281,10 @@ func TestScanLocalScanRootTracking(t *testing.T) {
 	if call.meta.ScanRoot != want {
 		t.Fatalf("expected scan root %q, got %q", want, call.meta.ScanRoot)
 	}
-	if call.meta.Path != "file.txt" {
-		t.Fatalf("expected path relative to scan root, got %q", call.meta.Path)
+	// Path stores the absolute filesystem path for local files (converged schema)
+	expectedPath := filepath.Join(want, "file.txt")
+	if call.meta.Path != expectedPath {
+		t.Fatalf("expected absolute path %q, got %q", expectedPath, call.meta.Path)
 	}
 	// With new schema, remote name is hostname, not scan root path
 	hostname, err := os.Hostname()

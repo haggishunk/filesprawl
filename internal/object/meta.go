@@ -8,6 +8,9 @@ import (
 type Meta struct {
 	Id   int
 	Name string
+	// Path stores the object location:
+	// - For local files: absolute filesystem path
+	// - For remote files: path within the remote
 	Path string
 	// BasePath represents the object store paths investigated
 	// keep these as metadata for scan result object
