@@ -23,14 +23,14 @@ type FilterOptions struct {
 
 // FileInfo holds per-file detail within a duplicate group.
 type FileInfo struct {
-	ID         int
-	Name       string
-	Path       string
-	MimeType   string
-	Size       int64
-	RemoteName string
-	Hostname   string
-	ScanRoot   string
+	ID           int
+	Name         string
+	Path         string
+	MimeType     string
+	Size         int64
+	LocationId   int
+	LocationName string
+	LocationType string
 }
 
 // DuplicateGroup is a set of files that share the same content hash.
@@ -47,6 +47,9 @@ type duplicateRepo interface {
 	FindDuplicatesWithinRemote(ctx context.Context, remoteName, hashType string, limit, offset int) ([]repository.HashGroup, error)
 	GetFilesByHash(ctx context.Context, hashValue, hashType string, minSize int64) ([]repository.FileRecord, error)
 	GetFilesByHashes(ctx context.Context, hashes []repository.HashTypePair, minSize int64) (repository.FilesByHashMap, error)
+	FindDuplicateFilenamesAcrossRemotes(ctx context.Context, minSize int64, limit, offset int) ([]repository.FilenameGroup, error)
+	FindDuplicateFilenamesWithinRemote(ctx context.Context, locationName string, minSize int64, limit, offset int) ([]repository.FilenameGroup, error)
+	GetFilesByFilename(ctx context.Context, filename string, minSize int64) ([]repository.FileRecord, error)
 }
 
 // DuplicateDetector finds and groups duplicate files using the repository.
@@ -78,6 +81,70 @@ func (d *DuplicateDetector) FindWithinRemote(ctx context.Context, remoteName str
 		return nil, fmt.Errorf("failed to find duplicates within remote %q: %w", remoteName, err)
 	}
 	return d.enrich(ctx, groups, opts.MinSize)
+}
+
+// FilenameGroup represents a group of files with matching names (but potentially different content).
+type FilenameGroup struct {
+	Filename string
+	Count    int
+	Files    []FileInfo
+}
+
+// FindDuplicateFilenamesByContent returns groups of files with the same name across all locations.
+func (d *DuplicateDetector) FindDuplicateFilenamesByContent(ctx context.Context, opts FilterOptions) ([]FilenameGroup, error) {
+	groups, err := d.repo.FindDuplicateFilenamesAcrossRemotes(ctx, opts.MinSize, opts.Limit, opts.Offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find duplicate filenames across remotes: %w", err)
+	}
+	return d.enrichFilenames(ctx, groups)
+}
+
+// FindDuplicateFilenamesWithinRemote returns groups of files with the same name within a single location.
+func (d *DuplicateDetector) FindDuplicateFilenamesWithinRemote(ctx context.Context, locationName string, opts FilterOptions) ([]FilenameGroup, error) {
+	if locationName == "" {
+		return nil, fmt.Errorf("locationName must not be empty")
+	}
+	groups, err := d.repo.FindDuplicateFilenamesWithinRemote(ctx, locationName, opts.MinSize, opts.Limit, opts.Offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find duplicate filenames within location %q: %w", locationName, err)
+	}
+	return d.enrichFilenames(ctx, groups)
+}
+
+// enrichFilenames fetches file details for all FilenameGroups and assembles result.
+func (d *DuplicateDetector) enrichFilenames(ctx context.Context, groups []repository.FilenameGroup) ([]FilenameGroup, error) {
+	result := make([]FilenameGroup, 0, len(groups))
+	for _, g := range groups {
+		records, err := d.repo.GetFilesByFilename(ctx, g.Filename, 0)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get files for filename %q: %w", g.Filename, err)
+		}
+
+		// Skip groups that don't have duplicates after filtering
+		if len(records) < 2 {
+			continue
+		}
+
+		files := make([]FileInfo, len(records))
+		for i, rec := range records {
+			files[i] = FileInfo{
+				ID:           rec.ID,
+				Name:         rec.Name,
+				Path:         rec.Path,
+				MimeType:     rec.MimeType,
+				Size:         rec.Size,
+				LocationId:   rec.LocationId,
+				LocationName: rec.LocationName,
+				LocationType: rec.LocationType,
+			}
+		}
+		result = append(result, FilenameGroup{
+			Filename: g.Filename,
+			Count:    len(records),
+			Files:    files,
+		})
+	}
+	return result, nil
 }
 
 // enrich fetches file details for all HashGroups in a single batch query and assembles DuplicateGroups.
@@ -115,14 +182,14 @@ func (d *DuplicateDetector) enrich(ctx context.Context, groups []repository.Hash
 		files := make([]FileInfo, len(records))
 		for i, rec := range records {
 			files[i] = FileInfo{
-				ID:         rec.ID,
-				Name:       rec.Name,
-				Path:       rec.Path,
-				MimeType:   rec.MimeType,
-				Size:       rec.Size,
-				RemoteName: rec.RemoteName,
-				Hostname:   rec.Hostname,
-				ScanRoot:   rec.ScanRoot,
+				ID:           rec.ID,
+				Name:         rec.Name,
+				Path:         rec.Path,
+				MimeType:     rec.MimeType,
+				Size:         rec.Size,
+				LocationId:   rec.LocationId,
+				LocationName: rec.LocationName,
+				LocationType: rec.LocationType,
 			}
 		}
 		result = append(result, DuplicateGroup{
@@ -145,15 +212,12 @@ func FormatReport(groups []DuplicateGroup) string {
 	for i, g := range groups {
 		fmt.Fprintf(&sb, "Group %d — %s (%s), %d copies\n", i+1, g.HashValue[:min(len(g.HashValue), 12)]+"...", g.HashType, g.Count)
 		for _, f := range g.Files {
-			remote := f.RemoteName
-			if f.Hostname != "" {
-				remote = f.Hostname + "/" + f.RemoteName
+			// Display location info
+			location := f.LocationName
+			if f.LocationType != "" {
+				location = f.LocationName + " (" + f.LocationType + ")"
 			}
-			root := ""
-			if f.ScanRoot != "" {
-				root = "  root: " + f.ScanRoot
-			}
-			fmt.Fprintf(&sb, "  • %s  [%s]  %d bytes  remote: %s%s\n", f.Name, f.Path, f.Size, remote, root)
+			fmt.Fprintf(&sb, "  • %s  [%s]  %d bytes  location: %s  path: %s\n", f.Name, f.Path, f.Size, location, f.Path)
 		}
 		sb.WriteString("\n")
 	}

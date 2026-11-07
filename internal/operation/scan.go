@@ -33,14 +33,18 @@ type Scanner struct {
 	Remote *remote.Remote
 	Repo   *repository.ObjectRepository
 	// ScanRoot is the remote path the scan was started at
-	ScanRoot string
+	ScanRoot        string
+	OnlyMissingDirs bool
+	ScannedDirs     map[string]bool // Pre-computed scanned directories for filtering
 	// writer channel
 }
 
 type ScannerOpt func(s *Scanner)
 
 func NewScanner(options ...ScannerOpt) Scanner {
-	s := Scanner{}
+	s := Scanner{
+		ScannedDirs: make(map[string]bool),
+	}
 
 	for _, opt := range options {
 		opt(&s)
@@ -68,8 +72,29 @@ func WithScanRoot(root string) ScannerOpt {
 	}
 }
 
+// WithScannerOnlyMissingDirs enables incremental scanning mode
+func WithScannerOnlyMissingDirs(only bool) ScannerOpt {
+	return func(s *Scanner) {
+		s.OnlyMissingDirs = only
+	}
+}
+
+// WithScannerScannedDirs sets the pre-computed set of scanned directories
+func WithScannerScannedDirs(dirs map[string]bool) ScannerOpt {
+	return func(s *Scanner) {
+		s.ScannedDirs = dirs
+	}
+}
+
 // Scan handles scanning of a remote
 func Scan(ctx context.Context, s *Scanner, lc rclone.ListConfig) error {
+	// On first call, ensure location exists for this remote
+	if s.Remote.Location.Id == 0 {
+		if err := s.Repo.EnsureLocation(ctx, &s.Remote.Location); err != nil {
+			return fmt.Errorf("failed to ensure location: %w", err)
+		}
+	}
+
 	// construct initial options, eg path
 	lr, err := rclone.ListJSON(ctx, lc)
 	if err != nil {
@@ -79,6 +104,11 @@ func Scan(ctx context.Context, s *Scanner, lc rclone.ListConfig) error {
 	// starting with files only
 	if lc.Opt.DirsOnly {
 		for _, lri := range lr.List {
+			// Skip directories that have already been scanned if in incremental mode
+			if s.OnlyMissingDirs && s.ScannedDirs[lri.Path] {
+				fmt.Printf("Skipping already scanned directory: %s\n", lri.Path)
+				continue
+			}
 			fmt.Printf("Descending into path: %s\n", lri.Path)
 			newLo := rclone.NewListOption(rclone.ListOptionFilesOnly())
 			newLc := rclone.NewListConfig(lc.Fs, lri.Path, &newLo)
@@ -94,7 +124,16 @@ func Scan(ctx context.Context, s *Scanner, lc rclone.ListConfig) error {
 		// do files iteration and persistence
 		for _, lri := range lr.List {
 			fmt.Printf("Found file: %s\n", lri)
-			err := s.Repo.PersistResult(ctx, s.Remote, lri, s.ScanRoot)
+
+			// Create Meta with LocationId set
+			// For remotes, object_path is the path within the remote
+			meta := object.NewMeta(lri.Name, lri.Path, lri.MimeType,
+				object.WithMetaSize(lri.Size),
+				object.WithMetaScanRoot(s.ScanRoot),
+				object.WithMetaLocationId(s.Remote.LocationId))
+
+			// Persist meta and hashes
+			err := s.persistRcloneFile(ctx, &meta, lri.Hashes)
 			if err != nil {
 				return fmt.Errorf("failed to persist: %w", err)
 			}
@@ -106,5 +145,51 @@ func Scan(ctx context.Context, s *Scanner, lc rclone.ListConfig) error {
 			return fmt.Errorf("failed scan: %w", err)
 		}
 	}
+	return nil
+}
+
+// persistRcloneFile persists a single rclone file with its hashes
+func (s *Scanner) persistRcloneFile(ctx context.Context, m *object.Meta, hashes map[string]string) error {
+	// Check if meta already persisted
+	err := s.Repo.ReadMeta(ctx, m)
+	if err != nil {
+		return fmt.Errorf("failed to get object meta from db: %w", err)
+	}
+	if !m.Persisted {
+		err = s.Repo.WriteMeta(ctx, m)
+		if err != nil {
+			return fmt.Errorf("failed to put object into db: %w", err)
+		}
+	}
+
+	// Persist hashes
+	for hType, hVal := range hashes {
+		h := object.NewHash(hVal, hType)
+
+		err := s.Repo.ReadHash(ctx, &h)
+		if err != nil {
+			return fmt.Errorf("failed to get hash from db: %w", err)
+		}
+		if !h.Persisted {
+			err = s.Repo.WriteHash(ctx, &h)
+			if err != nil {
+				return fmt.Errorf("failed to put hash into db: %w", err)
+			}
+		}
+
+		// Link meta to hash
+		mhj := object.NewMetaHashJunction(m.Id, h.Id)
+		err = s.Repo.ReadMetaHashJunction(ctx, &mhj)
+		if err != nil {
+			return fmt.Errorf("failed to get object meta hash junction from db: %w", err)
+		}
+		if !mhj.Persisted {
+			err = s.Repo.WriteMetaHashJunction(ctx, &mhj)
+			if err != nil {
+				return fmt.Errorf("failed to set object meta-hash junction in db: %w", err)
+			}
+		}
+	}
+
 	return nil
 }

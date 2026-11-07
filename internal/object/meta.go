@@ -17,9 +17,11 @@ type Meta struct {
 	Size     int64
 	// IsSymlink marks objects that are symlinks; their contents are never hashed
 	IsSymlink bool
-	// ScanRoot identifies the scan root that produced this record
-	ScanRoot  string
-	Persisted bool
+	// ScanRoot identifies the scan root that produced this record (kept for backward compat and filtering)
+	ScanRoot string
+	// LocationId references the location table (identifies file source)
+	LocationId int
+	Persisted  bool
 }
 
 func (o Meta) String() string {
@@ -68,5 +70,12 @@ func WithMetaSymlink(is bool) MetaOption {
 func WithMetaScanRoot(root string) MetaOption {
 	return func(o *Meta) {
 		o.ScanRoot = root
+	}
+}
+
+// WithMetaLocationId sets the location_id that identifies the file source
+func WithMetaLocationId(locId int) MetaOption {
+	return func(o *Meta) {
+		o.LocationId = locId
 	}
 }
