@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,10 +72,10 @@ func writeRaw(t *testing.T, ctx context.Context, repo *ObjectRepository, hashVal
 func writeMetaRaw(t *testing.T, ctx context.Context, repo *ObjectRepository, name, path, mime string) int {
 	t.Helper()
 
-	// Create or get a test location
+	// Create or get a test location - use name hash to ensure uniqueness
 	var locationID int
-	stamp := time.Now().Format("150405.000")
-	locName := "integ_location_" + stamp
+	stamp := time.Now().UnixNano()
+	locName := fmt.Sprintf("integ_location_%d_%s", stamp, name)
 	err := repo.db.QueryRow(ctx,
 		`INSERT INTO location (name, type) VALUES ($1, 'local') ON CONFLICT (name, type) DO UPDATE SET id = location.id RETURNING id`,
 		locName,
@@ -86,10 +87,13 @@ func writeMetaRaw(t *testing.T, ctx context.Context, repo *ObjectRepository, nam
 	// Build absolute path (local format: scan_root/path)
 	absPath := filepath.Join("/integ", path)
 
+	// Extract directory from absolute path
+	objDir := filepath.Dir(absPath)
+
 	var id int
 	err = repo.db.QueryRow(ctx,
-		`INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, location_id, absolute_path) VALUES ($1, $2, $3, 512, $4, $5) RETURNING id`,
-		name, path, mime, locationID, absPath,
+		`INSERT INTO object_meta (object_name, object_path, object_mime_type, object_size, location_id, object_directory) VALUES ($1, $2, $3, 512, $4, $5) RETURNING id`,
+		name, path, mime, locationID, objDir,
 	).Scan(&id)
 	if err != nil {
 		t.Fatalf("seed meta: %v", err)
@@ -272,8 +276,8 @@ func TestIntegration_PersistLocalResult_ScanRootDeduplication(t *testing.T) {
 	stamp := time.Now().Format("150405.000")
 	rootA := "/integ/photos-" + stamp
 	rootB := "/integ/photos-alt-" + stamp
-	remA := remote.NewLocalRemote("integ-host", rootA)
-	remB := remote.NewLocalRemote("integ-host", rootB)
+	remA := remote.NewLocalRemote("integ-host-a", rootA)
+	remB := remote.NewLocalRemote("integ-host-b", rootB)
 
 	// Ensure locations exist and are persisted
 	if err := repo.EnsureLocation(ctx, &remA.Location); err != nil {
@@ -429,6 +433,12 @@ func TestGetFilesByHashes(t *testing.T) {
 	pool := openTestDB(t)
 	repo := NewObjectRepository(database.NewPgxDatabase(pool))
 	ctx := context.Background()
+
+	// Clean up any leftover test data from previous runs
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash_junction WHERE object_hash_id IN (
+		SELECT id FROM object_hash WHERE hash_value IN ('batch_hash_1', 'batch_hash_2', 'batch_hash_3')
+	)`)
+	_, _ = repo.db.Exec(ctx, `DELETE FROM object_hash WHERE hash_value IN ('batch_hash_1', 'batch_hash_2', 'batch_hash_3')`)
 
 	// Create 3 hashes with 2 files each = 6 total files
 	hash1 := writeRaw(t, ctx, repo, "batch_hash_1", "md5")
