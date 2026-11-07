@@ -164,11 +164,11 @@ func persistLocalFile(ctx context.Context, ls *LocalScanner, scanRoot string, fi
 	absolutePath := filepath.Join(scanRoot, relPath)
 
 	// Create metadata object with new schema fields
-	meta := object.NewMeta(info.Name(), relPath, "application/octet-stream",
+	// Path stores the absolute filesystem path for local files
+	meta := object.NewMeta(info.Name(), absolutePath, "application/octet-stream",
 		object.WithMetaSize(info.Size()),
 		object.WithMetaScanRoot(scanRoot),
-		object.WithMetaLocationId(loc.Id),
-		object.WithMetaAbsolutePath(absolutePath))
+		object.WithMetaLocationId(loc.Id))
 
 	// Create local remote (kept for hash junction compatibility)
 	rem, err := localRemote(scanRoot)
@@ -214,12 +214,12 @@ func persistLocalSymlink(ctx context.Context, ls *LocalScanner, scanRoot string,
 	// Build absolute path: scanRoot + "/" + relPath
 	absolutePath := filepath.Join(scanRoot, relPath)
 
-	meta := object.NewMeta(info.Name(), relPath, "application/octet-stream",
+	// Path stores the absolute filesystem path for local files
+	meta := object.NewMeta(info.Name(), absolutePath, "application/octet-stream",
 		object.WithMetaSize(info.Size()),
 		object.WithMetaSymlink(true),
 		object.WithMetaScanRoot(scanRoot),
-		object.WithMetaLocationId(loc.Id),
-		object.WithMetaAbsolutePath(absolutePath))
+		object.WithMetaLocationId(loc.Id))
 
 	rem, err := localRemote(scanRoot)
 	if err != nil {

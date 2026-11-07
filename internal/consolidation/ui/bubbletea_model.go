@@ -530,21 +530,16 @@ func (m *ConsolidationModel) handleAction(action string) {
 //
 // REMOTE FILES (ScanRoot null):
 //
-// constructFilePath returns the absolute path for a file.
+// constructFilePath returns the path for a file.
 // For local files: full filesystem path (e.g., "/mnt/data/photos/IMG_0587.MOV")
-// For rclone files: remote:path format (e.g., "goblet:photos/IMG_0587.MOV")
-// The absolute path is stored directly in Meta.AbsolutePath.
+// For rclone files: path within remote (e.g., "photos/IMG_0587.MOV")
+// The path is stored directly in Meta.Path.
 func (m *ConsolidationModel) constructFilePath(version *browsing.FileVersion) string {
 	if version == nil || version.FileInfo == nil {
 		return ""
 	}
 
-	// AbsolutePath contains the full, ready-to-use path
-	if version.FileInfo.AbsolutePath != "" {
-		return version.FileInfo.AbsolutePath
-	}
-
-	// Fallback if AbsolutePath not set
+	// Path contains the full path ready to use
 	return version.FileInfo.Path
 }
 
